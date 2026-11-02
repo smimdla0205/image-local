@@ -41,10 +41,12 @@ def run_job(
     out_dir: Path,
     cancel_requested: Callable[[], bool],
     ws_factory: WsFactory = default_ws_factory,
+    commit_output: Callable[[], None] = lambda: None,
 ) -> OutputInfo | None:
     """잡을 실행해 결과 PNG 를 out_dir/<id>.png 에 저장한다. 성공하면 OutputInfo, 취소·실패·실행 안 함은 None.
 
     상태 전이는 조건부로 쓴다: 대기 중일 때만 시작하고(웹 쪽의 대기 중 취소를 덮지 않게), 실행 중일 때만 끝낸다.
+    commit_output 은 결과 파일을 쓴 뒤 succeeded 를 쓰기 전에 부른다(Modal 은 Volume commit — 웹 함수가 파일을 먼저 볼 수 있게).
     """
     if store.transition(job.id, ("queued",), status="running", step=0, total=job.steps) is None:
         return None
@@ -75,6 +77,7 @@ def run_job(
         output = OutputInfo(width=img.width, height=img.height, has_alpha=_has_alpha(img))
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"{job.id}.png").write_bytes(data)
+        commit_output()
         store.transition(job.id, ("running",), status="succeeded", step=job.steps, output=output.model_dump())
         return output
     except ComfyInterrupted:
