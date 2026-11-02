@@ -8,8 +8,19 @@ Hugging Face 오픈 웨이트 이미지 모델을 빌린 GPU 에 올려 쓰는 �
 cp .env.example .env
 npm install          # postinstall 이 Prisma 클라이언트도 생성한다
 npm run db:migrate   # dev.db 생성, 마이그레이션 적용
-npm run dev          # http://localhost:3000
+npm run dev          # http://127.0.0.1:3000
 ```
+
+앱이 읽는 키:
+
+| 키 | 뜻 |
+|---|---|
+| `DATABASE_URL` | SQLite 파일. 기본 `file:./dev.db` |
+| `GPU_API_URL`, `GPU_API_TOKEN` | GPU 워커 주소와 Bearer 토큰. Modal 워커 값은 `gpu/configure.py` 가 `.env.local` 에 쓴다 |
+| `STORAGE_DIR` | 이미지 저장 폴더. 없으면 `<앱>/storage` |
+| `HF_TOKEN` | 모델을 새로 받을 때만 쓴다. `configure.py secret` 이 Modal Secret 에 넣는다 |
+
+GPU 없이 돌리려면 작업공간 루트에서 `npm run qa:worker:mock`(8787)을 띄우고 `GPU_API_URL=http://localhost:8787`, `GPU_API_TOKEN=dev-token` 으로 둔다. `.env.local` 이 `.env` 보다 우선하므로 Modal 값이 `.env.local` 에 있으면 그쪽이 쓰인다. 테스트 명령은 작업공간 루트의 `tests/README.md` 에 있다.
 
 ## 명령
 
@@ -51,35 +62,51 @@ npm run dev          # http://localhost:3000
 
 ## 구조
 
-코드가 아직 없는 폴더는 비어 있다.
-
 ```
 imagen-local/
 ├── prisma/
-│   ├── schema.prisma          # User, Conversation, Job
+│   ├── schema.prisma          # User, Conversation(모델 고정), Job, Image
 │   └── migrations/
 ├── prisma7.config.ts          # Prisma CLI 설정 (Prisma 7.10 의 파일 이름)
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx         # 폰트, Providers
-│   │   ├── page.tsx           # 새 채팅
-│   │   ├── c/[id]/            # 대화별 화면
+│   │   ├── layout.tsx         # 폰트, Providers, 앱 틀(사이드바·이미지 뷰어)
+│   │   ├── page.tsx           # 새 대화: 모델 고르기 + 입력창
+│   │   ├── c/[id]/            # 대화 화면, 없는 대화 화면
+│   │   ├── gallery/           # 갤러리: 검색·모델 필터
 │   │   └── api/
-│   │       └── jobs/[id]/     # GET 상태(워커 폴링 동기화)·DELETE 취소
+│   │       ├── conversations/ # 목록·생성, [id] 조회(워커 동기화)·삭제, [id]/jobs 잡 추가
+│   │       ├── jobs/[id]/     # GET 상태(워커 폴링 동기화)·DELETE 취소
+│   │       ├── images/        # 갤러리 목록, [id] 조회·삭제
+│   │       ├── uploads/       # 고칠 사진 올리기
+│   │       └── files/         # 저장한 이미지·썸네일 서빙
 │   ├── components/
 │   │   ├── providers.tsx      # React Query, 테마, 툴팁, 토스트
 │   │   ├── ui/                # shadcn 생성물
-│   │   ├── chat/              # 메시지 목록, 프롬프트 입력, 모델 선택
-│   │   └── gallery/
+│   │   ├── shell/             # 앱 틀, 사이드바(대화 목록), 상단바
+│   │   ├── chat/              # 새 대화, 대화 화면, 입력창, 결과·진행 카드, 비교 슬라이더
+│   │   ├── gallery/           # 갤러리 격자·필터
+│   │   └── viewer/            # 이미지 뷰어(?image= 딥링크)
 │   ├── hooks/
 │   ├── lib/
 │   │   ├── db.ts              # Prisma 클라이언트 (better-sqlite3 어댑터)
 │   │   ├── utils.ts           # cn()
+│   │   ├── api/               # API 오류 응답, 라우트 공통 검사(Host·출처)
+│   │   ├── api-client.ts      # 브라우저 → 앱 API 호출
+│   │   ├── query-keys.ts      # React Query 키
+│   │   ├── streams.ts         # 크기 상한을 세며 스트림 읽기
 │   │   ├── storage/           # 이미지 저장. 로컬 파일 → S3 로 바꾸는 자리
-│   │   ├── gpu/               # config.ts 에 GPU 종류·개수. 모델 목록, GPU 서버 호출
-│   │   └── jobs/              # 생성 요청 만들기·조회
+│   │   ├── images/            # sharp: 회전 보정·축소·썸네일
+│   │   ├── gpu/               # config.ts(GPU 종류·개수), 모델 표, 크기 표, 워커 HTTP 클라이언트
+│   │   └── jobs/              # 잡 만들기·조회·워커 동기화·상태 전이
 │   └── generated/prisma/      # prisma generate 결과물. git 에 올리지 않는다
-├── gpu/                       # Modal GPU 워커(Python), workflows/ 에 ComfyUI API 포맷 워크플로
+├── gpu/                       # Modal GPU 워커(Python). 'GPU 워커' 절 참고
+│   ├── modal_app.py           # 웹 함수·GPU 클래스·모델 다운로드
+│   ├── modal_ui.py            # 템플릿 내보내기용 ComfyUI UI
+│   ├── configure.py           # .env.local 접속값과 Modal Secret 설정
+│   ├── worker/                # 잡 API(FastAPI), mock·Modal 백엔드, ComfyUI 클라이언트, 러너
+│   └── workflows/             # ComfyUI API 포맷 워크플로와 bindings.json
+├── storage/                   # 로컬 이미지 저장소(STORAGE_DIR 기본값). git 에 올리지 않는다
 ├── docs/                      # 모델 리서치
 └── public/
 ```

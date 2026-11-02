@@ -42,6 +42,11 @@ UI 는 [imagen-local 디자인 시스템](https://claude.ai/artifact/YFBRYfyRPFq
 ## 구현할 때 볼 것
 
 - Qwen-Image-2.1-Turbo 는 step 스케줄이 체크포인트에 들어 있어 `num_inference_steps` 로 바뀌지 않는다.
+- 완료 통지는 폴링이다. `GET /api/conversations/[id]`·`GET /api/jobs/[id]` 가 응답 전에 진행 중인 잡을 워커와 맞추고(`src/lib/jobs/sync.ts`), 워커가 꺼져 있으면 잡을 그대로 두고 `worker.reachable=false` 를 돌려준다. webhook 은 없다.
+- GPU 워커는 Modal 앱(`gpu/modal_app.py`)이다. 실행·배포 명령은 README 의 'GPU 워커' 절에 있다.
+- ComfyUI 워크플로는 `gpu/workflows/` 의 API 포맷 JSON 이고, 잡 값을 넣을 노드 입력은 `bindings.json` 이 정한다. 손으로 고치지 않고 작업공간 루트의 `tests/imagen-local/tools/export-workflows.mjs` 로 공식 템플릿에서 다시 내보낸다. 프롬프트 보강(TextGenerate)은 Klein 만들기에만 켜 있다. Klein 고치기는 한 번에 90초가 걸려 껐고, Qwen 은 보강 모델 파일이 없고, MOSS 는 사용자가 쓴 글자·태그를 그대로 쓰려고 껐다.
+- Qwen-Image-2.1 VAE 는 투명 배경을 고르지 않아도 RGBA 를 낸다. 러너가 투명 배경이 아닌 잡의 결과를 RGB 로 바꾼다.
+- ComfyUI 는 같은 그래프(프롬프트·시드·크기)의 결과를 캐시한다. 같은 시드로 다시 만들면 샘플링 없이 같은 이미지가 바로 나온다.
 - Qwen-Image-2.1 순정 VAE 는 체커보드 무늬와 fp16 NaN 문제가 있다. 대체 VAE 는 [파생판 문서 §2.3](docs/local-image-model-derivatives.md#23-평가-좋은-것) 에 있다.
 
 ## 레퍼런스
@@ -52,5 +57,5 @@ UI 는 [imagen-local 디자인 시스템](https://claude.ai/artifact/YFBRYfyRPFq
 | `hf download` 명령 | [리서치 문서 §8](docs/local-image-models-research.md#8-다운로드-명령) |
 | LoRA, VAE 교체 같은 파생판과 조합 레시피 | [파생판 문서 §7](docs/local-image-model-derivatives.md#7-조합-레시피) |
 | GPU 종류·개수 | `.env` 의 `GPU_TYPE`, `GPU_COUNT`. 기본값 H100 1대는 [src/lib/gpu/config.ts](src/lib/gpu/config.ts) |
-| GPU 서버 주소·토큰 | `.env` 의 `GPU_API_URL`, `GPU_API_TOKEN`. 형식은 [.env.example](.env.example) |
+| GPU 서버 주소·토큰 | `GPU_API_URL`, `GPU_API_TOKEN`. Modal 워커 값은 `gpu/configure.py` 가 `.env.local` 에 쓴다. mock 워커는 `http://localhost:8787`, `dev-token` |
 | Modal 계정 | `.env` 의 `MODAL_PROFILE`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`. Modal 은 `.env` 를 직접 읽지 않아서 modal 명령 전에 `set -a; source .env; set +a` 로 셸에 불러온다. 이 PC 에서는 `modal` 이 PATH 에 없으면 `python -m modal` 로 부른다 |
