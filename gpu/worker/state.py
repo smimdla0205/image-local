@@ -20,6 +20,10 @@ class JobStore(Protocol):
 
     def update(self, job_id: str, **fields: Any) -> dict: ...
 
+    def transition(self, job_id: str, from_statuses: tuple[str, ...], **fields: Any) -> dict | None:
+        """status 가 from_statuses 중 하나일 때만 fields 를 쓰고 새 레코드를, 아니면(없는 잡 포함) None 을 돌려준다."""
+        ...
+
     def delete(self, job_id: str) -> None: ...
 
     def items(self) -> list[tuple[str, dict]]: ...
@@ -47,6 +51,15 @@ class MemoryStore:
     def update(self, job_id: str, **fields: Any) -> dict:
         with self._lock:
             record = self._jobs[job_id]
+            record.update(fields)
+            return dict(record)
+
+    def transition(self, job_id: str, from_statuses: tuple[str, ...], **fields: Any) -> dict | None:
+        # 확인과 쓰기를 한 잠금 안에서 해 취소·완료가 서로를 덮지 않는다
+        with self._lock:
+            record = self._jobs.get(job_id)
+            if record is None or record["status"] not in from_statuses:
+                return None
             record.update(fields)
             return dict(record)
 
@@ -95,6 +108,15 @@ class DictStore:
         record = self.get(job_id)
         if record is None:
             raise KeyError(job_id)
+        record = {**record, **fields}
+        self._d.put(f"job:{job_id}", record)
+        return record
+
+    def transition(self, job_id: str, from_statuses: tuple[str, ...], **fields: Any) -> dict | None:
+        # modal.Dict 에는 비교 후 쓰기가 없어 읽고 바로 쓴다. 겹치는 창은 남지만 이미 끝난 잡을 덮는 일은 막는다
+        record = self.get(job_id)
+        if record is None or record["status"] not in from_statuses:
+            return None
         record = {**record, **fields}
         self._d.put(f"job:{job_id}", record)
         return record

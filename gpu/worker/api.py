@@ -93,13 +93,12 @@ def create_app(backend: Backend, token: str) -> FastAPI:
 
     @app.post("/jobs", status_code=202)
     def create_job(job: JobRequest, response: Response) -> JobAcceptedResponse | JobStatusResponse:
-        existing = backend.status(job.id)
-        if existing is not None:
-            # 같은 id 를 다시 보내면 새로 만들지 않고 지금 상태를 돌려준다(멱등)
+        status, created = backend.submit(job)
+        if not created:
+            # 같은 id 를 다시 보내면 새로 만들지 않고 지금 상태를 돌려준다(멱등). 확인과 생성은 백엔드가 한 번에 한다
             response.status_code = 200
-            return existing
-        accepted = backend.submit(job)
-        return JobAcceptedResponse(id=accepted.id, status="queued", queue_position=accepted.queue_position)
+            return status
+        return JobAcceptedResponse(id=status.id, status="queued", queue_position=status.queue_position)
 
     @app.get("/jobs/{job_id}")
     def get_job(job_id: str) -> JobStatusResponse:

@@ -13,11 +13,11 @@ next-env.d.ts
 # Prisma 생성 클라이언트·로컬 DB·테스트 DB
 src/generated/
 dev.db*
-test*.db*
+/test*.db*
 
-# 생성 이미지 저장소 (로컬 파일)
-storage/
-storage-test/
+# 생성 이미지 저장소 (로컬 파일, 앱 루트에만 생긴다 — src/lib/storage/ 같은 코드 폴더는 무시하지 않는다)
+/storage/
+/storage-test/
 
 # Python GPU 워커
 __pycache__/
