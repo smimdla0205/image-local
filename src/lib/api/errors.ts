@@ -1,5 +1,5 @@
 // API 오류 응답과 라우트 공통 처리. 단위 테스트가 별칭 없이 불러오므로 이 파일은 상대 경로 import 만 쓴다
-import { ZodError } from "zod";
+import { type z, ZodError } from "zod";
 
 // 사용자에게 그대로 보이는 문구(해요체)
 export const ERROR_MESSAGES: Record<string, string> = {
@@ -36,6 +36,17 @@ export class ApiError extends Error {
 
 export function jsonError(status: number, code: string, message?: string): Response {
   return Response.json({ error: { code, message: message ?? ERROR_MESSAGES[code] ?? ERROR_MESSAGES.internal_error } }, { status });
+}
+
+// JSON 본문을 읽어 스키마로 검증한다. JSON 이 아니면 400 invalid_request, 스키마 오류는 handleRoute 가 400 으로 바꾼다
+export async function parseJsonBody<S extends z.ZodType>(req: Request, schema: S): Promise<z.output<S>> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    throw new ApiError(400, "invalid_request");
+  }
+  return schema.parse(body);
 }
 
 // Next 의 전역 RouteContext 는 루트 tsc(단위 테스트)에서 보이지 않아 같은 모양을 직접 둔다
