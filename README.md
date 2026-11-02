@@ -25,6 +25,30 @@ npm run dev          # http://localhost:3000
 
 테스트는 작업공간 루트의 `tests/` 에서 관리한다. 이 앱 폴더에는 테스트 코드와 설정을 두지 않는다.
 
+## GPU 워커
+
+`gpu/` 는 Modal 앱 `imagen-local-gpu` 다. 웹 함수(FastAPI, CPU)가 잡을 받아 `modal.Dict` 에 상태를 쓰고 GPU 클래스(H100 1대, ComfyUI)를 부른다. 완료 통지는 따로 없고, 앱이 대화·잡 조회 때 워커를 폴링해 결과를 가져온다. 아래 명령은 작업공간 루트에서 돌린다.
+
+| 명령 | 하는 일 |
+|---|---|
+| `npm run qa:worker:setup` | 루트 `.venv` 에 워커 의존성과 pytest 설치 |
+| `npm run qa:worker` | 워커 테스트(pytest, 스모크 제외) |
+| `npm run qa:worker:mock` | GPU 없이 도는 mock 워커. 8787 포트, 토큰 `dev-token` |
+| `npm run qa:worker:smoke` | 배포된 워커를 실제로 부르는 스모크 테스트. H100 과금 |
+| `npm run imagen-local:gpu:configure -- secret` | `.env.local` 의 `GPU_API_TOKEN`(없거나 `dev-token` 이면 새로 만든다)과 `HF_TOKEN` 으로 Modal Secret `imagen-local-worker` 를 만든다 |
+| `npm run imagen-local:gpu:configure -- url <URL>` | 배포된 워커 주소를 `.env.local` 의 `GPU_API_URL` 에 쓴다 |
+| `npm run imagen-local:modal -- run project/imagen-local/gpu/modal_app.py::download_models` | 빠진 모델 파일만 Volume 에 받는다 |
+| `npm run imagen-local:modal -- deploy project/imagen-local/gpu/modal_app.py` | 배포. 주소는 `https://<workspace>--imagen-local-gpu-web.<region>.modal.run` |
+| `npm run imagen-local:modal -- app logs imagen-local-gpu` | 로그 보기 |
+| `npm run imagen-local:modal -- serve project/imagen-local/gpu/modal_ui.py` | 템플릿 내보내기용 ComfyUI UI(CPU, 인증 없음). 내보낸 뒤 바로 내린다 |
+| `node tests/imagen-local/tools/export-workflows.mjs <UI 주소>` | 공식 템플릿을 API 포맷으로 내보내 `gpu/workflows/` 에 쓴다 |
+
+- GPU 접속값 `GPU_API_URL`, `GPU_API_TOKEN` 은 `.env.local` 에 있고 `gpu/configure.py` 가 쓴다. Next 는 `.env.local` 을 `.env` 보다 먼저 읽는다.
+- ComfyUI 는 컨테이너의 `/root/comfy/ComfyUI` 에 있다. 모델은 Volume `imagen-local-models`(`/models`), 입력·결과 이미지는 Volume `imagen-local-data`(`/data`)에 있다.
+- `gpu/workflows/*.json` 은 ComfyUI 공식 템플릿을 내보낸 API 포맷이다. 잡 값(프롬프트·시드·크기·step·입력 이미지·파일 이름)을 넣을 노드 입력은 `bindings.json` 이 정한다. 템플릿이 바뀌면 내보내기 도구로 다시 만든다.
+- 마지막 잡 뒤 5분(`scaledown_window`)은 H100 이 켜져 있어 과금된다. 첫 요청은 모델을 올리느라 몇 분 걸린다.
+- 이 앱은 localhost 단일 사용자 앱이라 사용자 인증이 없다. 외부에 공개하기 전에 인증을 먼저 붙인다.
+
 ## 구조
 
 코드가 아직 없는 폴더는 비어 있다.
