@@ -2,14 +2,16 @@ import { ApiError, handleRoute } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient } from "@/lib/gpu/client";
 import { getConversationDetail, toConversationDetailDto } from "@/lib/jobs/queries";
+import { syncJobs } from "@/lib/jobs/sync";
 import { deleteFile, storageKey } from "@/lib/storage";
 
-// GET /api/conversations/[id] — 대화와 잡(최근 100개)
+// GET /api/conversations/[id] — 대화와 잡(최근 100개). 응답 전에 진행 중인 잡을 워커와 맞춘다(폴링)
 export const GET = handleRoute("conversations.get", async (_req, ctx) => {
   const { id } = await ctx.params;
   const detail = await getConversationDetail(id);
   if (!detail) throw new ApiError(404, "conversation_not_found");
-  return Response.json(toConversationDetailDto(detail.conversation, detail.jobs, { reachable: true }));
+  const synced = await syncJobs(detail.jobs);
+  return Response.json(toConversationDetailDto(detail.conversation, synced.jobs, synced.worker));
 });
 
 // DELETE /api/conversations/[id] — 확인 뒤 바로 영구 삭제. 진행 중인 잡은 워커에서 취소하고 이미지 파일도 지운다
