@@ -39,8 +39,11 @@ export function jsonError(status: number, code: string, message?: string): Respo
   return Response.json({ error: { code, message: message ?? ERROR_MESSAGES[code] ?? ERROR_MESSAGES.internal_error } }, { status });
 }
 
-// JSON 본문을 읽어 스키마로 검증한다. JSON 이 아니면 400 invalid_request, 스키마 오류는 handleRoute 가 400 으로 바꾼다
+// JSON 본문을 읽어 스키마로 검증한다. JSON 이 아니면 400 invalid_request, 스키마 오류는 handleRoute 가 400 으로 바꾼다.
+// Content-Type 을 application/json 으로 한정해 다른 사이트의 폼·sendBeacon 같은 단순 요청(사전 확인 없음)을 받지 않는다
 export async function parseJsonBody<S extends z.ZodType>(req: Request, schema: S): Promise<z.output<S>> {
+  const contentType = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (contentType !== "application/json") throw new ApiError(400, "invalid_request");
   let body: unknown;
   try {
     body = await req.json();
@@ -54,25 +57,38 @@ export async function parseJsonBody<S extends z.ZodType>(req: Request, schema: S
 export type RouteCtx = { params: Promise<Record<string, string>> };
 type RouteFn = (req: Request, ctx: RouteCtx) => Promise<Response>;
 
-// v1 은 로컬 단일 사용자 앱이라 사용자 인증이 없다. 대신 이 두 검사로 다른 사이트가 이 앱을 부르지 못하게 한다
-const ALLOWED_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+// v1 은 로컬 단일 사용자 앱이라 사용자 인증이 없다. 대신 아래 검사로 다른 사이트가 이 앱을 부르지 못하게 한다
+// Host(포트 포함)는 이 형식과 정확히 같아야 한다
+const LOCAL_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?$/i;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const SAME_SITE_VALUES = new Set(["same-origin", "none"]);
 
-function hostnameOf(host: string | null): string {
-  if (!host) return "";
-  // [::1]:3000 → [::1], localhost:3000 → localhost
-  return host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+function isLocalOrigin(origin: string): boolean {
+  try {
+    return LOCAL_HOST_RE.test(new URL(origin).host);
+  } catch {
+    // "null"(샌드박스 iframe·file://) 같은 값
+    return false;
+  }
+}
+
+// 다른 사이트가 브라우저로 보낸 상태 변경 요청인가. Sec-Fetch-Site 가 있으면 그것으로, 없으면(오래된 브라우저) Origin 으로 판단한다.
+// 둘 다 없는 요청(curl·서버 호출)은 브라우저 CSRF 가 아니므로 통과한다
+function isCrossSiteMutation(req: Request): boolean {
+  if (!MUTATING_METHODS.has(req.method)) return false;
+  const site = req.headers.get("sec-fetch-site");
+  if (site) return !SAME_SITE_VALUES.has(site);
+  const origin = req.headers.get("origin");
+  return origin !== null && !isLocalOrigin(origin);
 }
 
 export function handleRoute(name: string, fn: RouteFn): RouteFn {
   return async (req, ctx) => {
     try {
       // DNS 리바인딩: 다른 도메인 이름으로 이 서버에 닿은 요청은 거절한다
-      if (!ALLOWED_HOSTS.has(hostnameOf(req.headers.get("host")).toLowerCase())) return jsonError(403, "forbidden");
-      // CSRF: 브라우저가 다른 사이트에서 보낸 상태 변경 요청을 거절한다(헤더가 없는 curl·서버 호출은 통과)
-      const site = req.headers.get("sec-fetch-site");
-      if (MUTATING_METHODS.has(req.method) && site && !SAME_SITE_VALUES.has(site)) return jsonError(403, "forbidden");
+      if (!LOCAL_HOST_RE.test(req.headers.get("host") ?? "")) return jsonError(403, "forbidden");
+      // CSRF: 브라우저가 다른 사이트에서 보낸 상태 변경 요청을 거절한다
+      if (isCrossSiteMutation(req)) return jsonError(403, "forbidden");
       return await fn(req, ctx);
     } catch (err) {
       // Next 의 내부 신호(빌드 때 미리 렌더링 중단, notFound 등)는 오류 응답으로 바꾸지 않고 Next 에 돌려준다
