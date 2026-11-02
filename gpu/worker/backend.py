@@ -8,7 +8,7 @@ import uuid
 from io import BytesIO
 from typing import Protocol
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from .schemas import CancelResponse, InputResponse, JobRequest, JobStatusResponse, OutputInfo
 from .state import TERMINAL_STATUSES, JobStore, MemoryStore, new_record, queue_position, to_status
@@ -80,7 +80,8 @@ def decode_image(data: bytes) -> Image.Image:
         img.load()
     except Exception as e:
         raise InvalidImage("입력 이미지를 읽을 수 없어요") from e
-    return img
+    # 휴대폰 사진의 EXIF 회전을 픽셀에 반영한다(ComfyUI 는 EXIF 를 보지 않는다)
+    return ImageOps.exif_transpose(img)
 
 
 def cancel_record(store: JobStore, job_id: str) -> CancelResponse:

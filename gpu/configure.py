@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 APP_DIR = Path(__file__).resolve().parents[1]
 SECRET_NAME = "imagen-local-worker"
@@ -39,16 +40,22 @@ def read_env(path: Path) -> dict[str, str]:
     return values
 
 
+def _key_of(line: str) -> str:
+    return line.split("=", 1)[0].strip().removeprefix("export ").strip() if "=" in line else ""
+
+
 def set_env_value(path: Path, key: str, value: str) -> None:
-    """key 줄을 바꾸거나 끝에 더한다. 다른 줄은 그대로 둔다. 파일이 없으면 만든다."""
+    """key 줄을 하나로 바꾼다(첫 자리에 두고 같은 키의 다른 줄·export 줄은 지운다). 없으면 끝에 더하고, 파일이 없으면 만든다."""
     lines = path.read_text("utf-8").splitlines() if path.exists() else []
-    for i, line in enumerate(lines):
-        if line.split("=", 1)[0].strip() == key:
-            lines[i] = f"{key}={value}"
-            break
-    else:
-        lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n", "utf-8")
+    out: list[str] = []
+    for line in lines:
+        if _key_of(line) != key:
+            out.append(line)
+        elif not any(_key_of(kept) == key for kept in out):
+            out.append(f"{key}={value}")
+    if not any(_key_of(kept) == key for kept in out):
+        out.append(f"{key}={value}")
+    path.write_text("\n".join(out) + "\n", "utf-8")
 
 
 def _create_secret(values: dict[str, str]) -> subprocess.CompletedProcess:
@@ -81,11 +88,33 @@ def _secret(app_dir: Path) -> int:
         print(f"Modal Secret 을 만들지 못했어요: {message}", file=sys.stderr)
         return 1
     print(f"Modal Secret {SECRET_NAME}: {', '.join(values)}")
+    if "HF_TOKEN" not in values:
+        # --force 는 Secret 전체를 바꾼다. 대시보드에서만 넣어 둔 값은 여기서 알 수 없다
+        print("HF_TOKEN 을 찾지 못해 Secret 에 넣지 않았어요. 대시보드에서 넣어 둔 값이 있었다면 지워졌으니 다시 넣어 주세요", file=sys.stderr)
     return 0
 
 
+def _is_modal_url(url: str) -> bool:
+    # 토큰을 보낼 곳이라 호스트를 직접 본다(문자열 끝만 보면 ?x=.modal.run 같은 주소가 통과한다)
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    return (
+        parts.scheme == "https"
+        and (parts.hostname or "").endswith(".modal.run")
+        and parts.username is None
+        and parts.password is None
+        and port is None
+        and parts.path in ("", "/")
+        and not parts.query
+        and not parts.fragment
+    )
+
+
 def _url(app_dir: Path, url: str) -> int:
-    if not (url.startswith("https://") and url.rstrip("/").endswith(".modal.run")):
+    if not _is_modal_url(url):
         print("https://…modal.run 주소만 받아요", file=sys.stderr)
         return 2
     set_env_value(app_dir / ".env.local", "GPU_API_URL", url.rstrip("/"))

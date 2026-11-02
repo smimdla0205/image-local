@@ -3,6 +3,7 @@
 modal 을 import 하지 않는다 — Modal 쪽 동작(commit·reload·spawn·호출 취소·호출 상태)은 콜러블로 받아 로컬에서 테스트한다.
 """
 
+import logging
 import time
 import uuid
 from collections.abc import Callable
@@ -12,6 +13,8 @@ from typing import Literal
 from .backend import InvalidJob, cancel_record, decode_image
 from .schemas import CancelResponse, InputResponse, JobRequest, JobStatusResponse
 from .state import ACTIVE_STATUSES, JobStore, new_record, queue_position, to_status
+
+logger = logging.getLogger(__name__)
 
 CallState = Literal["pending", "done", "failed"]
 WORKER_DIED_MESSAGE = "워커가 예기치 않게 중단됐어요"
@@ -65,8 +68,19 @@ class ModalBackend:
         if job.kind == "edit" and not self._input_exists(str(job.input_id)):
             raise InvalidJob("input_id 를 찾을 수 없어요")
         record = new_record(job, time.time())
-        self.store.put(job.id, record)
-        self.store.put_meta(job.id, "call_id", self.spawn(job.id))
+        # 같은 id 가 동시에 와도(웹 컨테이너·스레드 여럿) 레코드를 만든 요청만 GPU 를 부른다
+        if not self.store.create(job.id, record):
+            existing = self.store.get(job.id)
+            if existing is None:  # 먼저 만든 요청이 GPU 호출에 실패해 레코드를 지웠다. 앱이 다시 보낸다
+                raise RuntimeError("잡 생성이 겹쳤어요")
+            return to_status(existing, queue_position(self.store, existing)), False
+        try:
+            call_id = self.spawn(job.id)
+        except Exception:
+            # GPU 호출을 걸지 못했으면 레코드를 지워, 같은 id 로 다시 보낼 때 새로 만들고 다시 부르게 한다
+            self.store.delete(job.id)
+            raise
+        self.store.put_meta(job.id, "call_id", call_id)
         return to_status(record, queue_position(self.store, record)), True
 
     def status(self, job_id: str) -> JobStatusResponse | None:
@@ -95,5 +109,9 @@ class ModalBackend:
             # 대기 중이던 GPU 호출도 거둬 컨테이너가 이 잡 때문에 뜨지 않게 한다
             call_id = self.store.get_meta(job_id, "call_id")
             if call_id:
-                self.cancel_call(call_id)
+                try:
+                    self.cancel_call(call_id)
+                except Exception as e:
+                    # 잡은 이미 취소로 기록됐다. GPU 쪽은 시작할 때 상태를 보고 건너뛴다
+                    logger.warning("GPU 호출 취소 실패: %s (%s)", job_id, type(e).__name__)
         return response

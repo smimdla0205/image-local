@@ -59,6 +59,13 @@ class ComfyClient:
         self.http = http
         self.idle_limit_s = idle_limit_s
 
+    def alive(self) -> bool:
+        """ComfyUI 서버가 응답하는지(GET /system_stats 가 200)."""
+        try:
+            return self.http.get(f"{self.base_url}/system_stats").status_code == 200
+        except httpx.HTTPError:
+            return False
+
     def upload_image(self, name: str, data: bytes) -> str:
         r = self.http.post(f"{self.base_url}/upload/image", files={"image": (name, data, "image/png")}, data={"overwrite": "true", "type": "input"})
         if r.status_code != 200:

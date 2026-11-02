@@ -18,6 +18,10 @@ class JobStore(Protocol):
 
     def put(self, job_id: str, record: dict) -> None: ...
 
+    def create(self, job_id: str, record: dict) -> bool:
+        """같은 id 가 없을 때만 넣고 True, 이미 있으면 그대로 두고 False(같은 잡이 동시에 두 번 와도 하나만 만든다)."""
+        ...
+
     def update(self, job_id: str, **fields: Any) -> dict: ...
 
     def transition(self, job_id: str, from_statuses: tuple[str, ...], **fields: Any) -> dict | None:
@@ -47,6 +51,13 @@ class MemoryStore:
     def put(self, job_id: str, record: dict) -> None:
         with self._lock:
             self._jobs[job_id] = dict(record)
+
+    def create(self, job_id: str, record: dict) -> bool:
+        with self._lock:
+            if job_id in self._jobs:
+                return False
+            self._jobs[job_id] = dict(record)
+            return True
 
     def update(self, job_id: str, **fields: Any) -> dict:
         with self._lock:
@@ -85,7 +96,7 @@ class DictLike(Protocol):
 
     def get(self, key: str, default: Any = None) -> Any: ...
 
-    def put(self, key: str, value: Any) -> Any: ...
+    def put(self, key: str, value: Any, *, skip_if_exists: bool = False) -> Any: ...
 
     def pop(self, key: str) -> Any: ...
 
@@ -103,6 +114,10 @@ class DictStore:
 
     def put(self, job_id: str, record: dict) -> None:
         self._d.put(f"job:{job_id}", dict(record))
+
+    def create(self, job_id: str, record: dict) -> bool:
+        # modal.Dict 의 skip_if_exists 는 서버에서 확인과 쓰기를 한 번에 한다
+        return bool(self._d.put(f"job:{job_id}", dict(record), skip_if_exists=True))
 
     def update(self, job_id: str, **fields: Any) -> dict:
         record = self.get(job_id)

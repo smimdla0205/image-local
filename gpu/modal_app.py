@@ -10,6 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import grpclib.exceptions
 import httpx
 import modal
 
@@ -37,14 +38,17 @@ COMFY_LAUNCH = [
     "--output-directory", str(COMFY_OUT), "--input-directory", str(COMFY_IN),
     "--disable-auto-launch",
 ]  # fmt: skip
-COMFY_READY_TIMEOUT_S = 540
+# ComfyUI 실행 명령과 준비 대기를 합쳐 컨테이너 시작 제한 안에 끝나게 한다(넘으면 Modal 이 원인 없이 컨테이너를 내린다)
+STARTUP_TIMEOUT_S = 600
+COMFY_LAUNCH_TIMEOUT_S = 180
+COMFY_READY_TIMEOUT_S = 400
 
 
 @app.cls(
     image=comfy_image,
     gpu="H100",
     timeout=600,
-    startup_timeout=600,
+    startup_timeout=STARTUP_TIMEOUT_S,
     scaledown_window=300,
     max_containers=1,
     volumes={"/models": models_volume, "/data": data_volume},
@@ -55,15 +59,10 @@ class GpuWorker:
     def start(self) -> None:
         for d in (DATA_DIR / "inputs", DATA_DIR / "outputs", COMFY_IN, COMFY_OUT):
             d.mkdir(parents=True, exist_ok=True)
-        subprocess.run(COMFY_LAUNCH, check=True, timeout=180)
+        subprocess.run(COMFY_LAUNCH, check=True, timeout=COMFY_LAUNCH_TIMEOUT_S)
         self.client = ComfyClient(COMFY_URL, httpx.Client(timeout=60.0))
         deadline = time.monotonic() + COMFY_READY_TIMEOUT_S
-        while True:
-            try:
-                if self.client.http.get(f"{COMFY_URL}/system_stats").status_code == 200:
-                    break
-            except httpx.HTTPError:
-                pass
+        while not self.client.alive():
             if time.monotonic() > deadline:
                 raise RuntimeError("ComfyUI 가 시작되지 않았어요")
             time.sleep(2)
@@ -97,6 +96,10 @@ class GpuWorker:
             # run_job 이 상태를 남기지 못하고 끝났으면(예외로 빠져나감) 실패로 닫는다
             self.store.transition(job_id, ("running",), status="failed", error=WORKER_DIED_MESSAGE)
             print(f"[gpu] job {job_id} {(self.store.get(job_id) or {}).get('status')}")
+            # ComfyUI 가 죽었으면 이 컨테이너는 더 받지 않고 내려가, 다음 잡이 새 컨테이너에서 돌게 한다
+            if not self.client.alive():
+                print("[gpu] ComfyUI 응답 없음: 이 컨테이너는 더 받지 않는다")
+                modal.experimental.stop_fetching_inputs()
 
 
 def _call_state(call_id: str) -> CallState:
@@ -104,9 +107,11 @@ def _call_state(call_id: str) -> CallState:
         modal.FunctionCall.from_id(call_id).get(timeout=0)
     except TimeoutError:  # 내장 TimeoutError: 아직 결과가 없다(대기·실행 중)
         return "pending"
-    except (modal.exception.ConnectionError, OSError):  # Modal 과의 통신 문제는 실행 실패가 아니다
+    except (modal.exception.ConnectionError, grpclib.exceptions.GRPCError, grpclib.exceptions.StreamTerminatedError):
+        # 이 컨테이너와 Modal 사이의 통신 문제는 GPU 실행 실패가 아니다
         return "pending"
-    except Exception:  # 호출이 시간 초과·컨테이너 오류로 실패해 끝났다
+    except Exception:
+        # GPU 쪽에서 난 예외(시간 초과·시작 실패 등)가 같은 타입으로 다시 나온다 — 실행이 실패로 끝났다
         return "failed"
     return "done"
 
