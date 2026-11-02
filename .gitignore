@@ -10,9 +10,22 @@ coverage/
 next-env.d.ts
 *.tsbuildinfo
 
-# Prisma 생성 클라이언트·로컬 DB
+# Prisma 생성 클라이언트·로컬 DB·테스트 DB
 src/generated/
 dev.db*
+test*.db*
+
+# 생성 이미지 저장소 (로컬 파일)
+storage/
+storage-test/
+
+# Python GPU 워커
+__pycache__/
+*.pyc
+.venv/
+
+# 브라우저 도구 산출물
+.playwright-mcp/
 
 # 비밀값 (.env.example 은 커밋)
 .env

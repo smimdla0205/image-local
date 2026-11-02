@@ -41,8 +41,7 @@ imagen-local/
 │   │   ├── page.tsx           # 새 채팅
 │   │   ├── c/[id]/            # 대화별 화면
 │   │   └── api/
-│   │       ├── jobs/          # POST 생성, [id]/ 에 GET 상태 폴링
-│   │       └── webhooks/gpu/  # GPU 워커 완료 콜백
+│   │       └── jobs/[id]/     # GET 상태(워커 폴링 동기화)·DELETE 취소
 │   ├── components/
 │   │   ├── providers.tsx      # React Query, 테마, 툴팁, 토스트
 │   │   ├── ui/                # shadcn 생성물
@@ -56,7 +55,7 @@ imagen-local/
 │   │   ├── gpu/               # config.ts 에 GPU 종류·개수. 모델 목록, GPU 서버 호출
 │   │   └── jobs/              # 생성 요청 만들기·조회
 │   └── generated/prisma/      # prisma generate 결과물. git 에 올리지 않는다
-├── gpu/                       # Python GPU 워커, workflows/ 에 ComfyUI 워크플로
+├── gpu/                       # Modal GPU 워커(Python), workflows/ 에 ComfyUI API 포맷 워크플로
 ├── docs/                      # 모델 리서치
 └── public/
 ```
