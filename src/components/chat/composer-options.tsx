@@ -46,7 +46,7 @@ export function ComposerOptions({ count, onCountChange, transparent, onTranspare
             {COUNTS.map((c) => (
               <label
                 key={c}
-                className="relative flex h-8 flex-1 cursor-pointer items-center justify-center rounded-md border text-caption font-medium has-checked:border-signal has-checked:bg-signal-subtle has-focus-visible:shadow-focus-ring max-md:h-11"
+                className="relative flex h-8 flex-1 cursor-pointer items-center justify-center rounded-md border text-caption font-medium transition-colors hover:bg-secondary has-checked:border-signal has-checked:bg-signal-subtle has-focus-visible:shadow-focus-ring max-md:h-11"
               >
                 <input
                   type="radio"

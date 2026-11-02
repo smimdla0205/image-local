@@ -166,6 +166,11 @@
   html {
     @apply font-sans;
   }
+  /* 누를 수 있는 버튼은 손가락 커서다(Tailwind 4 는 버튼에 기본 화살표를 둔다). 비활성 버튼은 그대로 둔다 */
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 
 /* 이미지 위 액션 버튼: 마우스는 hover·포커스 때, 터치 기기(hover 없음)는 항상 보인다 */

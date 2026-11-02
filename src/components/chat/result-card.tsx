@@ -14,7 +14,7 @@ import type { ImageDto, JobDto } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 
 export const FLOAT_CLASS =
-  "inline-grid size-8 place-items-center rounded-md bg-overlay text-overlay-foreground outline-none focus-visible:shadow-focus-ring max-md:size-11";
+  "inline-grid size-8 place-items-center rounded-md bg-overlay text-overlay-foreground transition-colors outline-none hover:bg-secondary hover:text-secondary-foreground focus-visible:shadow-focus-ring max-md:size-11";
 
 type Handlers = { onEdit: (img: ImageDto) => void; onRegenerate: (jobs: JobDto[]) => void; onCancel: (jobId: string) => void };
 
@@ -54,6 +54,8 @@ function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; 
         decoding="async"
         className={cn("block h-auto w-full", image.hasAlpha && "checker")}
       />
+      {/* 이미지 어디를 눌러도 크게 본다. 키보드·스크린리더는 위의 '크게 보기' 버튼을 쓴다 */}
+      <Link href={`?image=${image.id}`} scroll={false} tabIndex={-1} aria-hidden="true" className="absolute inset-0 cursor-zoom-in" />
       <TileActions image={image} model={model} onEdit={onEdit} />
     </figure>
   );

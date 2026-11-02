@@ -25,7 +25,9 @@ export function GalleryGrid({ images, label }: { images: ImageDto[]; label: stri
           <li key={img.id} className="group relative overflow-hidden rounded-md bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 512px WebP 썸네일 */}
             <img src={img.thumbUrl} alt={img.prompt ?? ""} loading="lazy" className={cn("block aspect-square w-full object-cover", img.hasAlpha && "checker")} />
-            <div className="hover-actions absolute bottom-2 left-2 flex gap-1">
+            {/* 이미지 어디를 눌러도 크게 본다. 키보드·스크린리더는 '크게 보기' 버튼을 쓴다 */}
+            <Link href={viewHref(img.id)} scroll={false} tabIndex={-1} aria-hidden="true" className="absolute inset-0 cursor-zoom-in" />
+            <div className="hover-actions pointer-events-none absolute bottom-2 left-2 flex gap-1">
               {spec && <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{spec.shortName}</span>}
               <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{img.kind === "EDITED" ? "고침" : "생성"}</span>
             </div>

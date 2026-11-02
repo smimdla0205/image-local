@@ -167,7 +167,7 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
             type="submit"
             aria-label="생성"
             disabled={!canSubmit}
-            className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-colors outline-none focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground max-md:size-11"
+            className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-colors outline-none enabled:hover:bg-primary/80 focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground max-md:size-11"
           >
             {busy ? <Spinner className="size-4" /> : <ArrowUpIcon aria-hidden="true" className="size-[18px]" />}
           </button>
