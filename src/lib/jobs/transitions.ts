@@ -18,8 +18,11 @@ const UNKNOWN_FAILURE_MESSAGE = "알 수 없는 오류예요.";
 export type SyncableJob = { status: JobStatusValue; step: number; hasImage: boolean };
 export type JobPatch = { status?: JobStatusValue; step?: number; queuePosition?: number | null; error?: string | null };
 
+// 아직 끝나지 않은 상태(Prisma `in` 조건에 그대로 넘기도록 변경 가능한 배열)
+export const ACTIVE_STATUSES: JobStatusValue[] = ["QUEUED", "RUNNING"];
+
 export function isActive(status: JobStatusValue): boolean {
-  return status === "QUEUED" || status === "RUNNING";
+  return ACTIVE_STATUSES.includes(status);
 }
 
 // 이미 끝난 잡은 바꾸지 않는다. succeeded 는 결과 이미지가 아직 없을 때만 내려받게 한다(이미지와 함께 저장)

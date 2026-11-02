@@ -3,6 +3,7 @@
 import { StepMeter } from "@/components/chat/step-meter";
 import { Button } from "@/components/ui/button";
 import type { JobDto } from "@/lib/jobs/schemas";
+import { isActive } from "@/lib/jobs/transitions";
 
 // 결과가 아직 없는 잡 하나: 대기·진행(취소·중지), 실패·중지됨(다시 생성)
 export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel: () => void; onRegenerate: (() => void) | null }) {
@@ -30,7 +31,7 @@ export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel
       detail = steps;
       action = onRegenerate && { label: "다시 생성", run: onRegenerate };
   }
-  const active = job.status === "QUEUED" || job.status === "RUNNING";
+  const active = isActive(job.status);
   return (
     <div role="status" className="flex flex-col gap-3 rounded-md border bg-card p-4">
       {active && <StepMeter total={job.steps} step={job.step} variant="meter" />}

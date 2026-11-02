@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { getModel, isModelId } from "@/lib/gpu/models";
+import { getModel } from "@/lib/gpu/models";
 import type { ImageDto } from "@/lib/jobs/schemas";
 
 async function copy(text: string, done: string) {
@@ -32,7 +32,7 @@ async function copy(text: string, done: string) {
 
 // 뷰어 오른쪽 정보: 프롬프트, 모델·방식·step·크기·시드·라이선스, 다운로드·고치기·삭제(확인 뒤 영구 삭제)
 export function ViewerPanel({ image, onDelete }: { image: ImageDto; onDelete: () => Promise<void> }) {
-  const spec = isModelId(image.model) ? getModel(image.model) : null;
+  const spec = image.model ? getModel(image.model) : null;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 

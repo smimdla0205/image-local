@@ -7,12 +7,12 @@ import { toast } from "sonner";
 import { ComposerOptions, type Count, ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
 import { RatioMenu } from "@/components/chat/ratio-menu";
 import { StepMeter } from "@/components/chat/step-meter";
-import { type ComposerTarget, TargetChip } from "@/components/chat/target-chip";
+import { type ComposerTarget, TargetChip, toTarget } from "@/components/chat/target-chip";
 import { Spinner } from "@/components/ui/spinner";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import type { Ratio } from "@/lib/gpu/sizes";
-import { type ImageDto, SEED_MAX } from "@/lib/jobs/schemas";
+import { type ImageDto, PROMPT_MAX, SEED_MAX } from "@/lib/jobs/schemas";
 
 export type { ComposerTarget };
 export type ComposerSubmit = { prompt: string; ratio: Ratio; count: Count; seed?: number; transparent: boolean; inputImageId?: string };
@@ -106,9 +106,9 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
       const body = new FormData();
       body.append("file", file);
       const img = await apiFetch<ImageDto>("/api/uploads", { method: "POST", body });
-      onTargetChange({ imageId: img.id, thumbUrl: img.thumbUrl, width: img.width, height: img.height, label: "올린 사진" });
+      onTargetChange(toTarget(img));
     } catch (err) {
-      toast.error(err instanceof ApiClientError ? err.message : "사진을 올리지 못했어요. 다시 시도해 주세요.");
+      toast.error(errorMessage(err, "사진을 올리지 못했어요. 다시 시도해 주세요."));
     } finally {
       setUploading(false);
     }
@@ -130,7 +130,7 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
           id={promptId}
           value={prompt}
           rows={2}
-          maxLength={4000}
+          maxLength={PROMPT_MAX}
           placeholder={placeholderFor(model, mode, target !== null)}
           aria-describedby={note ? noteId : undefined}
           onChange={(e) => setPrompt(e.target.value)}
@@ -141,7 +141,7 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" tabIndex={-1} aria-hidden="true" className="sr-only" onChange={handleFile} />
           <button
             type="button"
-            aria-label={spec.canEdit ? "고칠 사진 올리기" : "MOSS-Image 는 사진을 고치지 않아요"}
+            aria-label={spec.canEdit ? "고칠 사진 올리기" : `${spec.name} 는 사진을 고치지 않아요`}
             disabled={!spec.canEdit || uploading}
             onClick={() => fileRef.current?.click()}
             className={ICON_BUTTON_CLASS}

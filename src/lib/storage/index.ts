@@ -54,3 +54,14 @@ export async function readFile(key: string): Promise<Uint8Array<ArrayBuffer>> {
 export async function deleteFile(key: string): Promise<void> {
   await fs.rm(keyPath(key), { force: true });
 }
+
+// 이미지 한 장의 원본(PNG)과 썸네일(WebP)을 쓴다(원본 먼저)
+export async function putImageFiles(id: string, png: Uint8Array, thumb: Uint8Array): Promise<void> {
+  await putFile(storageKey("images", id), png);
+  await putFile(storageKey("thumbs", id), thumb);
+}
+
+// 원본과 썸네일을 함께 지운다. 한쪽이 실패해도 다른 쪽은 지우고, 오류는 던지지 않는다
+export async function deleteImageFiles(id: string): Promise<void> {
+  await Promise.allSettled([deleteFile(storageKey("images", id)), deleteFile(storageKey("thumbs", id))]);
+}

@@ -10,12 +10,14 @@ import { ModelPicker } from "@/components/chat/model-picker";
 import { toTarget } from "@/components/chat/target-chip";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
-import { getModel, type ModelId } from "@/lib/gpu/models";
-import type { ConversationDetailDto, ImageDto } from "@/lib/jobs/schemas";
+import { apiFetch, errorMessage } from "@/lib/api-client";
+import { getModel, type ModelId, MODELS } from "@/lib/gpu/models";
+import { type ConversationDetailDto, type ImageDto, parseId } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
-const ID_RE = /^[a-z0-9]+$/;
+// 모델 표에서 뽑는다: 고치기를 못 하는 모델 id 와, 고칠 이미지가 있을 때 바꿔 보낼 모델(고칠 수 있는 첫 모델)
+const NON_EDIT_IDS = MODELS.filter((m) => !m.canEdit).map((m) => m.id);
+const EDIT_FALLBACK_ID = MODELS.filter((m) => m.canEdit)[0].id;
 
 // 새 대화: 모델을 고르고 첫 요청을 보내면 대화가 시작된다. ?edit=<id> 는 '다른 모델로 고치기'로 넘어온 고칠 이미지(?image= 는 전역 이미지 뷰어가 쓴다)
 export function NewChat() {
@@ -23,10 +25,9 @@ export function NewChat() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const heroId = useId();
-  const raw = searchParams.get("edit");
-  const linkedId = raw && ID_RE.test(raw) ? raw : null;
+  const linkedId = parseId(searchParams.get("edit"));
 
-  const [model, setModel] = useState<ModelId>("klein");
+  const [model, setModel] = useState<ModelId>(MODELS[0].id);
   const [manualTarget, setManualTarget] = useState<ComposerTarget | null>(null);
   const [linkedDismissed, setLinkedDismissed] = useState(false);
   const linked = useQuery({
@@ -35,8 +36,8 @@ export function NewChat() {
     enabled: linkedId !== null,
   });
   const target = manualTarget ?? (linked.data && !linkedDismissed ? toTarget(linked.data) : null);
-  // 고칠 이미지가 있으면 고칠 수 없는 MOSS 는 고를 수 없다(이미 골랐다면 Klein 으로 보낸다)
-  const selected: ModelId = target && !getModel(model).canEdit ? "klein" : model;
+  // 고칠 이미지가 있으면 고칠 수 없는 모델은 고를 수 없다(이미 골랐다면 고칠 수 있는 모델로 보낸다)
+  const selected: ModelId = target && !getModel(model).canEdit ? EDIT_FALLBACK_ID : model;
 
   function handleTargetChange(t: ComposerTarget | null) {
     setManualTarget(t);
@@ -51,7 +52,7 @@ export function NewChat() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
       router.push(`/c/${created.id}`);
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : "문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.");
+      toast.error(errorMessage(e));
       throw e;
     }
   }
@@ -64,7 +65,7 @@ export function NewChat() {
           무엇을 만들까요?
         </h2>
         <div className="flex flex-col gap-2">
-          <ModelPicker value={selected} onChange={setModel} disabledIds={target ? ["moss"] : []} />
+          <ModelPicker value={selected} onChange={setModel} disabledIds={target ? NON_EDIT_IDS : []} />
           <p className="text-caption text-muted-foreground">모델은 대화를 시작할 때 정해요. 대화 안에서는 바뀌지 않아요.</p>
         </div>
         <Composer

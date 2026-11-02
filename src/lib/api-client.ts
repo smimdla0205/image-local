@@ -1,7 +1,7 @@
 // 브라우저 → 앱 API 호출. 오류 응답({ error: { code, message } })은 ApiClientError 로 바꾼다
 import type { ApiErrorBody } from "@/lib/jobs/schemas";
 
-const FALLBACK_MESSAGE = "문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.";
+export const FALLBACK_MESSAGE = "문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.";
 const NETWORK_MESSAGE = "서버에 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.";
 
 export class ApiClientError extends Error {
@@ -14,6 +14,11 @@ export class ApiClientError extends Error {
     this.status = status;
     this.code = code;
   }
+}
+
+// 알림에 쓸 문구. API·네트워크 오류는 그 문구를, 그 밖의 오류는 fallback 을 쓴다
+export function errorMessage(e: unknown, fallback = FALLBACK_MESSAGE): string {
+  return e instanceof ApiClientError ? e.message : fallback;
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {

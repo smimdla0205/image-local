@@ -10,8 +10,9 @@ import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/cli
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { fitToMegapixel, SIZE_BY_RATIO } from "@/lib/gpu/sizes";
 import { ACTIVE_WINDOW_MS, assertCapacity } from "@/lib/jobs/capacity";
-import { jobInclude, type JobWithImages } from "@/lib/jobs/queries";
+import { jobInclude, type JobWithImages, reloadJobs } from "@/lib/jobs/queries";
 import { type createJobsBodySchema, SEED_MAX, type WorkerState } from "@/lib/jobs/schemas";
+import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
 import { readFile, storageKey } from "@/lib/storage";
 
 export type CreateJobsInput = z.output<typeof createJobsBodySchema>;
@@ -40,7 +41,7 @@ export async function createJobs(tx: Prisma.TransactionClient, conversation: { i
   }
   if (input.transparent && !spec.supportsTransparent) throw new ApiError(400, "transparent_not_supported");
 
-  const active = await tx.job.count({ where: { status: { in: ["QUEUED", "RUNNING"] }, createdAt: { gte: new Date(Date.now() - ACTIVE_WINDOW_MS) } } });
+  const active = await tx.job.count({ where: { status: { in: ACTIVE_STATUSES }, createdAt: { gte: new Date(Date.now() - ACTIVE_WINDOW_MS) } } });
   assertCapacity(active, input.count);
 
   // 대화에 붙지 않은 업로드는 이 대화로 귀속해 대화를 지울 때 같이 지워지게 한다
@@ -77,7 +78,7 @@ export async function createJobs(tx: Prisma.TransactionClient, conversation: { i
 
 // 실행 중이 아닌 잡만 FAILED 로 바꾼다(그 사이 취소된 잡을 덮지 않게)
 async function markFailed(jobId: string, error: string): Promise<void> {
-  await prisma.job.updateMany({ where: { id: jobId, status: { in: ["QUEUED", "RUNNING"] } }, data: { status: "FAILED", error } });
+  await prisma.job.updateMany({ where: { id: jobId, status: { in: ACTIVE_STATUSES } }, data: { status: "FAILED", error } });
 }
 
 // 워커에 잡 하나를 보낸다. 워커를 지금 쓸 수 없으면 'unavailable'(DB 그대로, 다음 동기화가 다시 보낸다).
@@ -119,7 +120,7 @@ export async function submitToWorker(job: JobWithImages, inputIds: Map<string, s
       input_id: inputId,
     });
     // 아직 진행 중일 때만 제출 시각을 남긴다. 보내는 사이 사용자가 취소했다면 워커 쪽 잡도 취소한다(GPU 를 헛돌리지 않게)
-    const marked = await prisma.job.updateMany({ where: { id: job.id, submittedAt: null, status: { in: ["QUEUED", "RUNNING"] } }, data: { submittedAt: new Date() } });
+    const marked = await prisma.job.updateMany({ where: { id: job.id, submittedAt: null, status: { in: ACTIVE_STATUSES } }, data: { submittedAt: new Date() } });
     if (marked.count === 0) {
       const current = await prisma.job.findUnique({ where: { id: job.id }, select: { status: true } });
       if (current?.status === "CANCELLED") await client.cancelJob(job.id).catch(() => undefined);
@@ -154,7 +155,5 @@ export async function submitJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWith
       break;
     }
   }
-  const fresh = await prisma.job.findMany({ where: { id: { in: jobs.map((j) => j.id) } }, include: jobInclude });
-  const byId = new Map(fresh.map((j) => [j.id, j]));
-  return { jobs: jobs.map((j) => byId.get(j.id) ?? j), worker: { reachable } };
+  return { jobs: await reloadJobs(jobs, jobs.map((j) => j.id)), worker: { reachable } };
 }

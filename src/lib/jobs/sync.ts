@@ -6,16 +6,24 @@ import { prisma } from "@/lib/db";
 import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/client";
 import { inspectPng, makeThumb } from "@/lib/images/normalize";
 import { submitToWorker } from "@/lib/jobs/create";
-import { jobInclude, type JobWithImages } from "@/lib/jobs/queries";
+import { type JobWithImages, reloadJobs } from "@/lib/jobs/queries";
 import type { WorkerState } from "@/lib/jobs/schemas";
-import { applyWorkerStatus, isActive, type JobPatch, WORKER_LOST_MESSAGE } from "@/lib/jobs/transitions";
-import { deleteFile, putFile, storageKey } from "@/lib/storage";
-
-const ACTIVE = ["QUEUED", "RUNNING"] as const;
+import { ACTIVE_STATUSES, applyWorkerStatus, isActive, type JobPatch, WORKER_LOST_MESSAGE } from "@/lib/jobs/transitions";
+import { deleteImageFiles, putImageFiles } from "@/lib/storage";
 
 // 아직 진행 중인 잡에만 쓴다(그 사이 취소·완료된 잡을 덮지 않게)
 async function patchIfActive(jobId: string, patch: JobPatch): Promise<void> {
-  await prisma.job.updateMany({ where: { id: jobId, status: { in: [...ACTIVE] } }, data: patch });
+  await prisma.job.updateMany({ where: { id: jobId, status: { in: ACTIVE_STATUSES } }, data: patch });
+}
+
+// 지금 행과 값이 모두 같은 패치는 쓰지 않는다(폴링마다 같은 값을 다시 쓰지 않게)
+function changesRow(job: JobWithImages, patch: JobPatch): boolean {
+  return (
+    (patch.status !== undefined && patch.status !== job.status) ||
+    (patch.step !== undefined && patch.step !== job.step) ||
+    (patch.queuePosition !== undefined && patch.queuePosition !== job.queuePosition) ||
+    (patch.error !== undefined && patch.error !== job.error)
+  );
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -39,14 +47,11 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
     return;
   }
   const imageId = randomUUID().replaceAll("-", "");
-  const imageKey = storageKey("images", imageId);
-  const thumbKey = storageKey("thumbs", imageId);
   try {
-    await putFile(imageKey, png);
-    await putFile(thumbKey, thumb);
+    await putImageFiles(imageId, png, thumb);
     await prisma.$transaction(async (tx) => {
       // 아직 진행 중일 때만 완료로 바꾼다(그 사이 취소·실패된 잡을 덮지 않는다)
-      const claimed = await tx.job.updateMany({ where: { id: job.id, status: { in: [...ACTIVE] } }, data: patch });
+      const claimed = await tx.job.updateMany({ where: { id: job.id, status: { in: ACTIVE_STATUSES } }, data: patch });
       if (claimed.count === 0) throw new JobNoLongerActive();
       // 고친 원본이 그 사이 지워졌을 수 있어 부모는 지금 기준으로 다시 확인한다(버전 번호는 원본 기준 그대로)
       const parent = job.inputImageId ? await tx.image.findUnique({ where: { id: job.inputImageId }, select: { id: true } }) : null;
@@ -72,7 +77,7 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
     });
   } catch (e) {
     // 행을 못 만들었으면 파일도 남기지 않는다
-    await Promise.allSettled([deleteFile(imageKey), deleteFile(thumbKey)]);
+    await deleteImageFiles(imageId);
     if (e instanceof JobNoLongerActive) return;
     // jobId unique 위반 = 동시에 들어온 다른 동기화가 이미 저장했다(멱등)
     if (isUniqueViolation(e)) {
@@ -83,7 +88,8 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
   }
 }
 
-// 활성 잡을 차례로 워커와 맞춘다. 한 잡의 오류가 응답 전체를 500 으로 만들지 않도록 잡마다 따로 처리한다.
+// 활성 잡을 워커와 맞춘다. 제출된 잡의 워커 상태는 한꺼번에 요청하고, 반영은 잡 순서대로 하나씩 한다.
+// 한 잡의 오류가 응답 전체를 500 으로 만들지 않도록 잡마다 따로 처리한다.
 // 워커를 쓸 수 없으면 남은 잡은 건너뛰고 reachable=false(DB 는 그대로, 다음 폴링이 이어 간다)
 export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithImages[]; worker: WorkerState }> {
   const active = jobs.filter((j) => isActive(j.status));
@@ -91,23 +97,32 @@ export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithIm
   const client = getWorkerClient();
   let reachable = true;
   const touched = new Set<string>();
+  const inputIds = new Map<string, string>();
 
-  for (const job of active) {
+  // 제출된 잡의 워커 상태 요청을 한꺼번에 보낸다(미제출은 null). 모두 끝난 뒤 순서대로 반영하므로 중간에 멈춰도 처리되지 않은 거부가 남지 않는다
+  const requests = active.map((job) => ({ job, status: job.submittedAt ? client.getJob(job.id) : null }));
+  await Promise.allSettled(requests.map((r) => r.status));
+
+  for (const { job, status } of requests) {
     try {
-      if (!job.submittedAt) {
+      if (!status) {
         // 생성할 때 워커가 없었던 잡은 이제 보낸다
         touched.add(job.id);
-        if ((await submitToWorker(job)) === "unavailable") {
+        if ((await submitToWorker(job, inputIds)) === "unavailable") {
           reachable = false;
           break;
         }
         continue;
       }
-      const ws = await client.getJob(job.id);
+      const ws = await status;
       const { patch, fetchOutput } = applyWorkerStatus({ status: job.status, step: job.step, hasImage: job.image !== null }, ws);
-      touched.add(job.id);
-      if (fetchOutput) await saveOutput(job, patch);
-      else if (Object.keys(patch).length > 0) await patchIfActive(job.id, patch);
+      if (fetchOutput) {
+        touched.add(job.id);
+        await saveOutput(job, patch);
+      } else if (changesRow(job, patch)) {
+        touched.add(job.id);
+        await patchIfActive(job.id, patch);
+      }
     } catch (e) {
       if (isWorkerUnavailable(e)) {
         reachable = false;
@@ -126,7 +141,5 @@ export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithIm
   }
 
   if (touched.size === 0) return { jobs, worker: { reachable } };
-  const fresh = await prisma.job.findMany({ where: { id: { in: [...touched] } }, include: jobInclude });
-  const byId = new Map(fresh.map((j) => [j.id, j]));
-  return { jobs: jobs.map((j) => byId.get(j.id) ?? j), worker: { reachable } };
+  return { jobs: await reloadJobs(jobs, touched), worker: { reachable } };
 }

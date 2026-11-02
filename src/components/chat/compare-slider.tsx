@@ -17,9 +17,16 @@ export function CompareSlider({ before, after }: { before: ImageDto; after: Imag
       style={{ aspectRatio: `${after.width} / ${after.height}` }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG(크기 고정)라 next/image 최적화가 필요 없다 */}
-      <img src={after.url} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} className="absolute inset-0 size-full object-cover" />
+      <img src={after.url} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
       {/* eslint-disable-next-line @next/next/no-img-element -- 위와 같다 */}
-      <img src={before.url} alt={`버전 ${before.version}`} className="absolute inset-0 size-full object-cover" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
+      <img
+        src={before.url}
+        alt={`버전 ${before.version}`}
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 size-full object-cover"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+      />
       <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white/90 shadow" style={{ left: `${pos}%` }} />
       <span
         aria-hidden="true"

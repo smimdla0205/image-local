@@ -4,7 +4,7 @@ import { ApiError, handleRoute } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { makeThumb, normalizeImage, readImageSize } from "@/lib/images/normalize";
 import { toImageDto } from "@/lib/jobs/queries";
-import { deleteFile, putFile, storageKey } from "@/lib/storage";
+import { deleteImageFiles, putImageFiles } from "@/lib/storage";
 import { readStreamLimited } from "@/lib/streams";
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -66,18 +66,15 @@ export const POST = handleRoute("uploads.create", async (req) => {
   }
 
   const id = randomUUID().replaceAll("-", "");
-  const imageKey = storageKey("images", id);
-  const thumbKey = storageKey("thumbs", id);
-  await putFile(imageKey, normalized.png);
   try {
-    await putFile(thumbKey, thumb);
+    await putImageFiles(id, normalized.png, thumb);
     const image = await prisma.image.create({
       data: { id, kind: "UPLOADED", width: normalized.width, height: normalized.height, hasAlpha: normalized.hasAlpha, bytes: normalized.png.length },
     });
     return Response.json(toImageDto(image), { status: 201 });
   } catch (e) {
     // 행을 못 만들었으면 파일도 남기지 않는다
-    await Promise.all([deleteFile(imageKey), deleteFile(thumbKey)]);
+    await deleteImageFiles(id);
     throw e;
   }
 });

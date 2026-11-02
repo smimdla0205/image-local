@@ -76,6 +76,13 @@ export async function getConversationDetail(id: string): Promise<{ conversation:
   return { conversation, jobs: recent.reverse() };
 }
 
+// 주어진 id 의 잡만 DB 에서 다시 읽어 같은 자리에 끼운다(나머지는 그대로)
+export async function reloadJobs(jobs: JobWithImages[], ids: Iterable<string>): Promise<JobWithImages[]> {
+  const fresh = await prisma.job.findMany({ where: { id: { in: [...ids] } }, include: jobInclude });
+  const byId = new Map(fresh.map((j) => [j.id, j]));
+  return jobs.map((j) => byId.get(j.id) ?? j);
+}
+
 function toConversationDto(c: Conversation, thumbImageId: string | null): ConversationDto {
   return {
     id: c.id,

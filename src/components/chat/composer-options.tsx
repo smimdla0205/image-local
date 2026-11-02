@@ -7,6 +7,7 @@ import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { SEED_MAX } from "@/lib/jobs/schemas";
 
 export const COUNTS = [1, 2, 4] as const;
 export type Count = (typeof COUNTS)[number];
@@ -93,7 +94,7 @@ export function ComposerOptions({ count, onCountChange, transparent, onTranspare
           />
           {seedInvalid && (
             <p id={`${seedId}-error`} className="text-caption text-destructive">
-              0 이상 2147483647 이하의 정수를 입력해 주세요.
+              {`0 이상 ${SEED_MAX} 이하의 정수를 입력해 주세요.`}
             </p>
           )}
         </div>

@@ -1,11 +1,10 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { ApiError, handleRoute } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/client";
 import { jobInclude, toJobDto } from "@/lib/jobs/queries";
 import { syncJobs } from "@/lib/jobs/sync";
-import { isActive } from "@/lib/jobs/transitions";
-
-const ACTIVE = ["QUEUED", "RUNNING"] as const;
+import { ACTIVE_STATUSES, isActive } from "@/lib/jobs/transitions";
 
 async function findJob(id: string) {
   const job = await prisma.job.findUnique({ where: { id }, include: jobInclude });
@@ -13,8 +12,10 @@ async function findJob(id: string) {
   return job;
 }
 
-async function cancelInDb(id: string): Promise<void> {
-  await prisma.job.updateMany({ where: { id, status: { in: [...ACTIVE] } }, data: { status: "CANCELLED", queuePosition: null } });
+// 진행 중인 잡만 CANCELLED 로 바꾸고 바뀐 행 수를 돌려준다(extraWhere 로 조건을 더한다)
+async function cancelInDb(id: string, extraWhere: Prisma.JobWhereInput = {}): Promise<number> {
+  const { count } = await prisma.job.updateMany({ where: { id, status: { in: ACTIVE_STATUSES }, ...extraWhere }, data: { status: "CANCELLED", queuePosition: null } });
+  return count;
 }
 
 // GET /api/jobs/[id] — 워커와 맞춘 뒤 잡 하나
@@ -31,8 +32,7 @@ export const DELETE = handleRoute("jobs.cancel", async (_req, ctx) => {
   if (!isActive(job.status)) throw new ApiError(409, "job_finished");
 
   // 워커에 보낸 적 없는 잡은 워커를 부르지 않고 취소한다(그 사이 제출이 끝났으면 아래에서 워커에 취소를 보낸다)
-  const cancelledLocally =
-    !job.submittedAt && (await prisma.job.updateMany({ where: { id, status: { in: [...ACTIVE] }, submittedAt: null }, data: { status: "CANCELLED", queuePosition: null } })).count > 0;
+  const cancelledLocally = !job.submittedAt && (await cancelInDb(id, { submittedAt: null })) > 0;
   if (!cancelledLocally) {
     const current = await findJob(id);
     if (!isActive(current.status)) throw new ApiError(409, "job_finished");

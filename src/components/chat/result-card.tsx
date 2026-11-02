@@ -13,7 +13,7 @@ import { getModel, type ModelId } from "@/lib/gpu/models";
 import type { ImageDto, JobDto } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 
-const FLOAT_CLASS =
+export const FLOAT_CLASS =
   "inline-grid size-8 place-items-center rounded-md bg-overlay text-overlay-foreground outline-none focus-visible:shadow-focus-ring max-md:size-11";
 
 type Handlers = { onEdit: (img: ImageDto) => void; onRegenerate: (jobs: JobDto[]) => void; onCancel: (jobId: string) => void };
@@ -45,7 +45,15 @@ function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; 
   return (
     <figure className="group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG 라 next/image 최적화가 필요 없다 */}
-      <img src={image.url} alt={image.prompt ?? ""} width={image.width} height={image.height} className={cn("block h-auto w-full", image.hasAlpha && "checker")} />
+      <img
+        src={image.url}
+        alt={image.prompt ?? ""}
+        width={image.width}
+        height={image.height}
+        loading="lazy"
+        decoding="async"
+        className={cn("block h-auto w-full", image.hasAlpha && "checker")}
+      />
       <TileActions image={image} model={model} onEdit={onEdit} />
     </figure>
   );

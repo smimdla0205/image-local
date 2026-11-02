@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { apiFetch, errorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 
 type Props = {
@@ -46,7 +46,7 @@ export function ConversationMenu({ id, onDeletingChange }: Props) {
       router.push("/");
     } catch (e) {
       onDeletingChange(false);
-      toast.error(e instanceof ApiClientError ? e.message : "대화를 지우지 못했어요. 다시 시도해 주세요.");
+      toast.error(errorMessage(e, "대화를 지우지 못했어요. 다시 시도해 주세요."));
     } finally {
       setBusy(false);
     }

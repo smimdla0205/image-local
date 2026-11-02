@@ -12,17 +12,15 @@ import { groupBatches, Thread } from "@/components/chat/thread";
 import { WorkerBanner } from "@/components/chat/worker-banner";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { ratioFromSize } from "@/lib/gpu/sizes";
-import type { ConversationDetailDto, ImageDto, JobDto, JobsCreatedDto } from "@/lib/jobs/schemas";
+import { type ConversationDetailDto, type ImageDto, type JobDto, type JobsCreatedDto, parseId } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 import { queryKeys } from "@/lib/query-keys";
 
 // 진행 중인 잡이 있을 때 대화를 다시 불러오는 간격(GET 이 워커와 맞춘다)
 const POLL_MS = 1500;
-const ID_RE = /^[a-z0-9]+$/;
-const FALLBACK = "문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.";
 
 function findImage(detail: ConversationDetailDto, id: string): ImageDto | null {
   for (const j of detail.jobs) {
@@ -58,7 +56,8 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   // ?target= 은 처음 열 때뿐 아니라 같은 대화 안에서 바뀔 때(뷰어의 '이어서 고치기')도 반영한다(렌더 중 조정)
   const targetParam = searchParams.get("target");
   const targetFromParam = (param: string | null): ComposerTarget | null => {
-    const img = param && ID_RE.test(param) ? findImage(detail, param) : null;
+    const imageId = parseId(param);
+    const img = imageId ? findImage(detail, imageId) : null;
     return img ? toTarget(img) : null;
   };
   const [manualTarget, setManualTarget] = useState<ComposerTarget | null>(() => targetFromParam(targetParam));
@@ -74,9 +73,12 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const autoTarget = spec.canEdit && latest && latest.batchId !== dismissedBatchId && latestImage ? toTarget(latestImage) : null;
   const target = manualTarget ?? autoTarget;
 
-  // 결과 이미지 수가 바뀌면 사이드바 썸네일·순서를 새로 받는다(외부 캐시와 맞추는 일이라 Effect)
+  // 결과 이미지 수가 바뀌면 사이드바 썸네일·순서를 새로 받는다(외부 캐시와 맞추는 일이라 Effect). 처음 그릴 때는 받지 않는다
   const imageCount = detail.jobs.filter((j) => j.image).length;
+  const prevImageCount = useRef(imageCount);
   useEffect(() => {
+    if (prevImageCount.current === imageCount) return;
+    prevImageCount.current = imageCount;
     void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
   }, [imageCount, queryClient]);
 
@@ -97,7 +99,8 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     queryClient.setQueryData<ConversationDetailDto>(queryKeys.conversations.detail(id), (old) =>
       old ? { ...old, jobs: [...old.jobs, ...created.jobs], worker: created.worker } : old,
     );
-    void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    // 상세는 위에서 바로 채웠고 진행 중인 잡이 있으면 폴링이 다시 불러오므로 목록만 새로 받는다
+    void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
   }
 
   async function handleSubmit(d: ComposerSubmit) {
@@ -106,7 +109,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       setManualTarget(null);
       setDismissedBatchId(null);
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : FALLBACK);
+      toast.error(errorMessage(e));
       throw e;
     }
   }
@@ -123,7 +126,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
         inputImageId: first.inputImage?.id,
       });
     } catch (e) {
-      toast.error(e instanceof ApiClientError ? e.message : FALLBACK);
+      toast.error(errorMessage(e));
     }
   }
 
@@ -132,7 +135,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       await apiFetch(`/api/jobs/${jobId}`, { method: "DELETE" });
     } catch (e) {
       // 이미 끝난 잡(409)은 "이미 끝난 작업이에요." 만 알린다
-      toast.error(e instanceof ApiClientError ? e.message : FALLBACK);
+      toast.error(errorMessage(e));
     } finally {
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
     }

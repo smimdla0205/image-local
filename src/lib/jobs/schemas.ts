@@ -7,12 +7,19 @@ import { type Ratio, RATIOS } from "../gpu/sizes";
 export type { ModelId, Ratio };
 
 export const SEED_MAX = 2_147_483_647;
+export const PROMPT_MAX = 4000;
+
+// 쿼리스트링의 id 형식(소문자·숫자). 형식이 다르면 null
+export const ID_RE = /^[a-z0-9]+$/;
+export function parseId(raw: string | null): string | null {
+  return raw && ID_RE.test(raw) ? raw : null;
+}
 
 export const modelIdSchema = z.enum(MODEL_IDS);
 export const ratioSchema = z.enum(RATIOS);
 
 export const jobOptionsSchema = z.object({
-  prompt: z.string().trim().min(1).max(4000),
+  prompt: z.string().trim().min(1).max(PROMPT_MAX),
   // 고치기(inputImageId 있음)면 무시하고 입력 이미지 크기를 쓴다
   ratio: ratioSchema.default("1:1"),
   count: z.union([z.literal(1), z.literal(2), z.literal(4)]).default(1),

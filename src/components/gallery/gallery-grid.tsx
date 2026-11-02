@@ -5,11 +5,9 @@ import { DownloadIcon, Maximize2Icon, PencilIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { getModel, isModelId } from "@/lib/gpu/models";
+import { FLOAT_CLASS } from "@/components/chat/result-card";
+import { getModel } from "@/lib/gpu/models";
 import type { ImageDto } from "@/lib/jobs/schemas";
-
-const FLOAT_CLASS =
-  "inline-grid size-8 place-items-center rounded-md bg-overlay text-overlay-foreground outline-none focus-visible:shadow-focus-ring max-md:size-11";
 
 // 갤러리 타일 격자. 크게 보기는 지금 검색·필터를 남긴 채 ?image= 를 붙인다
 export function GalleryGrid({ images, label }: { images: ImageDto[]; label: string }) {
@@ -22,7 +20,7 @@ export function GalleryGrid({ images, label }: { images: ImageDto[]; label: stri
   return (
     <ul aria-label={label} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
       {images.map((img) => {
-        const spec = isModelId(img.model) ? getModel(img.model) : null;
+        const spec = img.model ? getModel(img.model) : null;
         return (
           <li key={img.id} className="group relative overflow-hidden rounded-md bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 512px WebP 썸네일 */}
