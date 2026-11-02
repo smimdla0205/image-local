@@ -24,6 +24,10 @@ import { queryKeys } from "@/lib/query-keys";
 const POLL_MS = 1500;
 const QUEUED_POLL_MS = 3000;
 
+function scrollToBottom(): void {
+  window.scrollTo({ top: document.documentElement.scrollHeight });
+}
+
 export function ConversationView({ id, initialData }: { id: string; initialData: ConversationDetailDto }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -82,21 +86,31 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const autoTarget = spec.canEdit && latest && latest.batchId !== dismissedBatchId && latestImage ? toTarget(latestImage) : null;
   const target = manualTarget ?? autoTarget;
 
-  // 결과 이미지 수가 바뀌면 사이드바 썸네일·순서를 새로 받는다(외부 캐시와 맞추는 일이라 Effect). 처음 그릴 때는 받지 않는다
+  // 새 요청이 붙으면 문서 맨 아래로 스크롤한다. 스레드 끝만 맞추면 아래에 붙은 입력창이 마지막 내용을 덮는다
+  const jobCount = detail.jobs.length;
+  useEffect(() => {
+    scrollToBottom();
+  }, [jobCount]);
+
+  // 맨 아래(80px 이내)를 보고 있는지. 결과가 나와 아래가 길어질 때 따라 내려갈지 정한다(창 스크롤 구독이라 Effect)
+  const atBottom = useRef(true);
+  useEffect(() => {
+    const onScroll = () => {
+      atBottom.current = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 80;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // 결과 이미지 수가 바뀌면 사이드바 썸네일·순서를 새로 받고(외부 캐시와 맞추는 일이라 Effect), 맨 아래를 보던 중이면 따라 내려간다. 처음 그릴 때는 하지 않는다
   const imageCount = detail.jobs.filter((j) => j.image).length;
   const prevImageCount = useRef(imageCount);
   useEffect(() => {
     if (prevImageCount.current === imageCount) return;
     prevImageCount.current = imageCount;
     void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
+    if (atBottom.current) scrollToBottom();
   }, [imageCount, queryClient]);
-
-  // 새 요청이 붙으면 맨 아래로 스크롤한다
-  const endRef = useRef<HTMLDivElement>(null);
-  const jobCount = detail.jobs.length;
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [jobCount]);
 
   function handleTargetChange(t: ComposerTarget | null) {
     setManualTarget(t);
@@ -168,7 +182,6 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-4 pb-6 sm:px-6">
         {!detail.worker.reachable && <WorkerBanner />}
         <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} />
-        <div ref={endRef} />
       </div>
       <div className="sticky bottom-0 mx-auto w-full max-w-205 bg-background px-4 pb-4 sm:px-6 sm:pb-6">
         {/* 모델 고정은 상단 자물쇠가, 고칠 이미지는 칩이 알려 준다. 고치기를 못 하는 이유만 여기서 알린다 */}
