@@ -46,9 +46,9 @@ function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; 
     <figure className="group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
       <Link href={`?image=${image.id}`} scroll={false} tabIndex={-1} className="block cursor-zoom-in">
-        {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG 라 next/image 최적화가 필요 없다 */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 화면용 WebP(원본 크기)라 next/image 최적화가 필요 없다 */}
         <img
-          src={image.url}
+          src={image.previewUrl}
           alt={image.prompt ?? ""}
           width={image.width}
           height={image.height}

@@ -16,8 +16,9 @@ function toModelId(model: string): ModelId {
   return model;
 }
 
-export function imageUrls(id: string): { url: string; thumbUrl: string } {
-  return { url: `/api/files/images/${id}.png`, thumbUrl: `/api/files/thumbs/${id}.webp` };
+// url: PNG 원본(다운로드), thumbUrl: 목록용 썸네일, previewUrl: 화면용 WebP
+export function imageUrls(id: string): { url: string; thumbUrl: string; previewUrl: string } {
+  return { url: `/api/files/images/${id}.png`, thumbUrl: `/api/files/thumbs/${id}.webp`, previewUrl: `/api/files/previews/${id}.webp` };
 }
 
 export function toImageDto(i: Image): ImageDto {

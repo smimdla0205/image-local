@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { ERROR_MESSAGES } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/client";
-import { inspectPng, makeThumb } from "@/lib/images/normalize";
+import { inspectPng, makePreview, makeThumb } from "@/lib/images/normalize";
 import { submitToWorker } from "@/lib/jobs/create";
 import { type JobWithImages, reloadJobs } from "@/lib/jobs/queries";
 import type { WorkerState } from "@/lib/jobs/schemas";
@@ -38,9 +38,11 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
   const png = await getWorkerClient().getOutput(job.id);
   let info: Awaited<ReturnType<typeof inspectPng>>;
   let thumb: Uint8Array;
+  let preview: Uint8Array;
   try {
     info = await inspectPng(png);
     thumb = await makeThumb(png);
+    preview = await makePreview(png);
   } catch {
     // 워커가 읽을 수 없는 이미지를 돌려줬다. 다시 받아도 같으므로 실패로 끝낸다
     await patchIfActive(job.id, { status: "FAILED", error: ERROR_MESSAGES.internal_error });
@@ -48,7 +50,7 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
   }
   const imageId = randomUUID().replaceAll("-", "");
   try {
-    await putImageFiles(imageId, png, thumb);
+    await putImageFiles(imageId, png, thumb, preview);
     await prisma.$transaction(async (tx) => {
       // 아직 진행 중일 때만 완료로 바꾼다(그 사이 취소·실패된 잡을 덮지 않는다)
       const claimed = await tx.job.updateMany({ where: { id: job.id, status: { in: ACTIVE_STATUSES } }, data: patch });

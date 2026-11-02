@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { ApiError, handleRoute } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
-import { makeThumb, normalizeImage, readImageSize } from "@/lib/images/normalize";
+import { makePreview, makeThumb, normalizeImage, readImageSize } from "@/lib/images/normalize";
 import { toImageDto } from "@/lib/jobs/queries";
 import { deleteImageFiles, putImageFiles } from "@/lib/storage";
 import { readStreamLimited } from "@/lib/streams";
@@ -57,9 +57,11 @@ export const POST = handleRoute("uploads.create", async (req) => {
 
   let normalized: Awaited<ReturnType<typeof normalizeImage>>;
   let thumb: Uint8Array;
+  let preview: Uint8Array;
   try {
     normalized = await normalizeImage(bytes);
     thumb = await makeThumb(normalized.png);
+    preview = await makePreview(normalized.png);
   } catch {
     // 머리말은 읽혔지만 픽셀 데이터가 깨진 경우
     throw new ApiError(400, "invalid_image");
@@ -67,7 +69,7 @@ export const POST = handleRoute("uploads.create", async (req) => {
 
   const id = randomUUID().replaceAll("-", "");
   try {
-    await putImageFiles(id, normalized.png, thumb);
+    await putImageFiles(id, normalized.png, thumb, preview);
     const image = await prisma.image.create({
       data: { id, kind: "UPLOADED", width: normalized.width, height: normalized.height, hasAlpha: normalized.hasAlpha, bytes: normalized.png.length },
     });

@@ -62,6 +62,7 @@ export type ImageDto = {
   parentId: string | null;
   url: string;
   thumbUrl: string;
+  previewUrl: string;
   createdAt: string;
 };
 

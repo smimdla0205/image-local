@@ -70,9 +70,9 @@ export function ImageViewerDialog() {
           </p>
         ) : (
           <div className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 화면용 WebP(원본 크기) */}
             <img
-              src={image.data.url}
+              src={image.data.previewUrl}
               alt={image.data.prompt ?? "올린 사진"}
               width={image.data.width}
               height={image.data.height}

@@ -42,3 +42,10 @@ export async function normalizeImage(input: Uint8Array): Promise<NormalizedImage
 export async function makeThumb(png: Uint8Array): Promise<Uint8Array> {
   return sharp(png).resize(THUMB_SIZE, THUMB_SIZE, { fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
 }
+
+// 화면에 보이는 이미지(결과·비교·뷰어): 원본과 같은 크기의 WebP, 투명도 유지. 1MP 생성 이미지가 PNG 1.1MB → 약 80KB. 다운로드는 PNG 원본
+export const PREVIEW_QUALITY = 85;
+
+export async function makePreview(png: Uint8Array): Promise<Uint8Array> {
+  return sharp(png).webp({ quality: PREVIEW_QUALITY }).toBuffer();
+}

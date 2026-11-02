@@ -16,11 +16,11 @@ export function CompareSlider({ before, after }: { before: ImageDto; after: Imag
       className="relative w-full overflow-hidden rounded-md bg-muted has-focus-visible:shadow-focus-ring"
       style={{ aspectRatio: `${after.width} / ${after.height}` }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG(크기 고정)라 next/image 최적화가 필요 없다 */}
-      <img src={after.url} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 화면용 WebP(원본 크기)라 next/image 최적화가 필요 없다 */}
+      <img src={after.previewUrl} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
       {/* eslint-disable-next-line @next/next/no-img-element -- 위와 같다 */}
       <img
-        src={before.url}
+        src={before.previewUrl}
         alt={`버전 ${before.version}`}
         loading="lazy"
         decoding="async"
