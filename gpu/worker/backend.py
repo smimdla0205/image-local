@@ -11,7 +11,7 @@ from typing import Protocol
 from PIL import Image, ImageDraw, ImageOps
 
 from .schemas import CancelResponse, InputResponse, JobRequest, JobStatusResponse, OutputInfo
-from .state import TERMINAL_STATUSES, JobStore, MemoryStore, new_record, queue_position, to_status
+from .state import ACTIVE_STATUSES, CANCEL_REQUESTED, TERMINAL_STATUSES, JobStore, MemoryStore, new_record, status_of
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,8 @@ class Backend(Protocol):
 # 입력 이미지: 받는 형식과 픽셀 수 상한(헤더만 읽고 디코드 전에 거른다 — 압축 폭탄 방지)
 ALLOWED_INPUT_FORMATS = {"PNG", "JPEG", "WEBP"}
 MAX_INPUT_PIXELS = 4096 * 4096
+# 알파 채널이 있는 Pillow 이미지 모드(입력 저장과 결과 확인이 같이 쓴다)
+ALPHA_MODES = ("RGBA", "LA", "PA")
 
 
 def decode_image(data: bytes) -> Image.Image:
@@ -86,29 +88,40 @@ def decode_image(data: bytes) -> Image.Image:
 
 def cancel_record(store: JobStore, job_id: str) -> CancelResponse:
     """취소 요청 공통 규칙: 없으면 404, 끝났으면 409, 대기 중이면 바로 cancelled, 실행 중이면 플래그만 켠다."""
-    record = store.get(job_id)
-    if record is None:
-        raise JobNotFound("잡을 찾을 수 없어요")
-    if record["status"] in TERMINAL_STATUSES:
-        raise AlreadyFinished("이미 끝난 잡이에요")
+
+    def require_unfinished() -> None:
+        record = store.get(job_id)
+        if record is None:
+            raise JobNotFound("잡을 찾을 수 없어요")
+        if record["status"] in TERMINAL_STATUSES:
+            raise AlreadyFinished("이미 끝난 잡이에요")
+
+    require_unfinished()
     # 실행하는 쪽이 이 플래그를 보고 멈춘다. 상태보다 먼저 켜야 대기열에서 막 꺼낸 잡도 놓치지 않는다
-    store.put_meta(job_id, "cancel_requested", True)
+    store.put_meta(job_id, CANCEL_REQUESTED, True)
     if store.transition(job_id, ("queued",), status="cancelled") is not None:
         return CancelResponse(id=job_id, status="cancelled")
     # 그 사이 실행이 시작됐거나 끝났다. 끝난 잡은 덮어쓰지 않는다
-    current = store.get(job_id)
-    if current is None:
-        raise JobNotFound("잡을 찾을 수 없어요")
-    if current["status"] in TERMINAL_STATUSES:
-        raise AlreadyFinished("이미 끝난 잡이에요")
+    require_unfinished()
     return CancelResponse(id=job_id, status="cancel_requested")
+
+
+def claim_queued(store: JobStore, job_id: str) -> dict | None:
+    """실행을 시작할 대기 중 잡의 레코드. 없거나 대기 중이 아니면 None, 취소가 요청돼 있으면 cancelled 로 닫고 None."""
+    record = store.get(job_id)
+    if record is None or record["status"] != "queued":
+        return None
+    if store.get_meta(job_id, CANCEL_REQUESTED):
+        store.transition(job_id, ("queued",), status="cancelled")
+        return None
+    return record
 
 
 # 모델별 mock 출력 색
 _MOCK_COLORS = {"klein": (63, 81, 181), "qwen-turbo": (0, 150, 136), "moss": (255, 152, 0)}
 
 
-def render_mock_png(model: str, width: int, height: int, transparent: bool) -> tuple[bytes, bool]:
+def render_mock_png(model: str, width: int, height: int, transparent: bool) -> bytes:
     color = _MOCK_COLORS[model]
     if transparent:
         img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -119,7 +132,7 @@ def render_mock_png(model: str, width: int, height: int, transparent: bool) -> t
         img = Image.new("RGB", (width, height), color)
     buf = BytesIO()
     img.save(buf, format="PNG")
-    return buf.getvalue(), transparent
+    return buf.getvalue()
 
 
 class MockBackend:
@@ -133,7 +146,7 @@ class MockBackend:
     def __init__(self, store: JobStore | None = None, step_interval: float = 0.2) -> None:
         self.store = store if store is not None else MemoryStore()
         self.step_interval = step_interval
-        self._inputs: dict[str, tuple[int, int]] = {}
+        self._inputs: set[str] = set()
         self._outputs: dict[str, bytes] = {}
         self._queue: queue.Queue[str | None] = queue.Queue()
         self._stop = threading.Event()
@@ -155,7 +168,7 @@ class MockBackend:
     def put_input(self, data: bytes, content_type: str) -> InputResponse:
         img = decode_image(data)
         input_id = str(uuid.uuid4())
-        self._inputs[input_id] = img.size
+        self._inputs.add(input_id)
         return InputResponse(input_id=input_id, width=img.width, height=img.height)
 
     def submit(self, job: JobRequest) -> tuple[JobStatusResponse, bool]:
@@ -163,7 +176,7 @@ class MockBackend:
         with self._lock:
             existing = self.store.get(job.id)
             if existing is not None:
-                return to_status(existing, queue_position(self.store, existing)), False
+                return status_of(self.store, existing), False
             if job.kind == "edit" and job.input_id not in self._inputs:
                 raise InvalidJob("input_id 를 찾을 수 없어요")
             # 같은 시각에 들어온 잡도 순서가 섞이지 않게 created_at 을 늘려 간다
@@ -172,13 +185,13 @@ class MockBackend:
             record = new_record(job, created_at)
             self.store.put(job.id, record)
             self._queue.put(job.id)
-        return to_status(record, queue_position(self.store, record)), True
+        return status_of(self.store, record), True
 
     def status(self, job_id: str) -> JobStatusResponse | None:
         record = self.store.get(job_id)
         if record is None:
             return None
-        return to_status(record, queue_position(self.store, record))
+        return status_of(self.store, record)
 
     def output(self, job_id: str) -> bytes | None:
         record = self.store.get(job_id)
@@ -199,14 +212,11 @@ class MockBackend:
             except Exception:
                 # 잡 id 만 남긴다(프롬프트는 로그에 쓰지 않는다)
                 logger.exception("mock 잡 처리 실패: %s", job_id)
-                self.store.transition(job_id, ("queued", "running"), status="failed", error="워커 내부 오류예요")
+                self.store.transition(job_id, ACTIVE_STATUSES, status="failed", error="워커 내부 오류예요")
 
     def _run(self, job_id: str) -> None:
-        record = self.store.get(job_id)
-        if record is None or record["status"] != "queued":
-            return
-        if self.store.get_meta(job_id, "cancel_requested"):
-            self.store.transition(job_id, ("queued",), status="cancelled")
+        record = claim_queued(self.store, job_id)
+        if record is None:
             return
         # 그 사이 취소됐으면 시작하지 않는다(cancelled 를 running 으로 되살리지 않게)
         if self.store.transition(job_id, ("queued",), status="running") is None:
@@ -215,7 +225,7 @@ class MockBackend:
         for step in range(1, total + 1):
             if self._stop.wait(self.step_interval):
                 return
-            if self.store.get_meta(job_id, "cancel_requested"):
+            if self.store.get_meta(job_id, CANCEL_REQUESTED):
                 self.store.transition(job_id, ("running",), status="cancelled")
                 return
             if self.store.transition(job_id, ("running",), step=step) is None:
@@ -227,7 +237,6 @@ class MockBackend:
         if prompt.startswith("[lost]"):
             self.store.delete(job_id)
             return
-        png, has_alpha = render_mock_png(record["model"], record["width"], record["height"], record["transparent"])
-        self._outputs[job_id] = png
-        output = OutputInfo(width=record["width"], height=record["height"], has_alpha=has_alpha)
+        self._outputs[job_id] = render_mock_png(record["model"], record["width"], record["height"], record["transparent"])
+        output = OutputInfo(width=record["width"], height=record["height"], has_alpha=record["transparent"])
         self.store.transition(job_id, ("running",), status="succeeded", step=total, output=output.model_dump())

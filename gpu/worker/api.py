@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .backend import Backend, BackendError
+from .backend import Backend, BackendError, JobNotFound
 from .models import MODEL_IDS
 from .schemas import CancelResponse, HealthResponse, InputResponse, JobAcceptedResponse, JobRequest, JobStatusResponse
 
@@ -19,12 +19,13 @@ MAX_INPUT_BYTES = 20 * 1024 * 1024
 ALLOWED_INPUT_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 
-class ApiError(Exception):
+class ApiError(BackendError):
+    """요청 자체의 오류(미디어 타입·크기 등). 상태 코드와 코드를 호출하는 곳에서 정한다."""
+
     def __init__(self, status: int, code: str, message: str) -> None:
         super().__init__(message)
-        self.status = status
+        self.http_status = status
         self.code = code
-        self.message = message
 
 
 def error_response(status: int, code: str, message: str) -> JSONResponse:
@@ -56,10 +57,6 @@ def create_app(backend: Backend, token: str) -> FastAPI:
     @app.exception_handler(BackendError)
     async def on_backend_error(_request: Request, exc: BackendError):
         return error_response(exc.http_status, exc.code, exc.message)
-
-    @app.exception_handler(ApiError)
-    async def on_api_error(_request: Request, exc: ApiError):
-        return error_response(exc.status, exc.code, exc.message)
 
     @app.exception_handler(StarletteHTTPException)
     async def on_http_error(_request: Request, exc: StarletteHTTPException):
@@ -105,13 +102,13 @@ def create_app(backend: Backend, token: str) -> FastAPI:
     def get_job(job_id: str) -> JobStatusResponse:
         status = backend.status(job_id)
         if status is None:
-            raise ApiError(404, "not_found", "잡을 찾을 수 없어요")
+            raise JobNotFound("잡을 찾을 수 없어요")
         return status
 
     @app.get("/jobs/{job_id}/output")
     def get_output(job_id: str) -> Response:
         if backend.status(job_id) is None:
-            raise ApiError(404, "not_found", "잡을 찾을 수 없어요")
+            raise JobNotFound("잡을 찾을 수 없어요")
         data = backend.output(job_id)
         if data is None:
             raise ApiError(409, "not_ready", "결과가 아직 없어요")

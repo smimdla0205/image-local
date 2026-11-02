@@ -12,6 +12,10 @@ from .schemas import JobRequest, JobStatusResponse, OutputInfo
 ACTIVE_STATUSES = ("queued", "running")
 TERMINAL_STATUSES = ("succeeded", "failed", "cancelled")
 
+# 웹 쪽이 meta 에 쓰는 키
+CANCEL_REQUESTED = "cancel_requested"
+CALL_ID = "call_id"
+
 
 class JobStore(Protocol):
     def get(self, job_id: str) -> dict | None: ...
@@ -179,3 +183,8 @@ def to_status(record: dict, position: int) -> JobStatusResponse:
         error=record.get("error"),
         output=OutputInfo(**output) if output else None,
     )
+
+
+def status_of(store: JobStore, record: dict, items: list[tuple[str, dict]] | None = None) -> JobStatusResponse:
+    """레코드의 응답용 상태. 대기 순번은 저장소(items 를 넘기면 그 스냅샷)에서 센다."""
+    return to_status(record, queue_position(store, record, items))

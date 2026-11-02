@@ -4,20 +4,23 @@ modal 을 import 하지 않는다 — Modal 쪽 동작(commit·reload·spawn·�
 """
 
 import logging
+import threading
 import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
-from .backend import InvalidJob, cancel_record, decode_image
+from .backend import ALPHA_MODES, InvalidJob, cancel_record, decode_image
 from .schemas import CancelResponse, InputResponse, JobRequest, JobStatusResponse
-from .state import ACTIVE_STATUSES, JobStore, new_record, queue_position, to_status
+from .state import ACTIVE_STATUSES, CALL_ID, JobStore, new_record, status_of
 
 logger = logging.getLogger(__name__)
 
 CallState = Literal["pending", "done", "failed"]
 WORKER_DIED_MESSAGE = "워커가 예기치 않게 중단됐어요"
+# 대기 순번을 세는 저장소 스냅샷을 여러 요청이 나눠 쓰는 시간(초). 대기 중인 잡을 잇달아 조회할 때 modal.Dict 를 매번 훑지 않게 한다
+QUEUE_SNAPSHOT_TTL_S = 1.0
 
 
 class ModalBackend:
@@ -41,11 +44,13 @@ class ModalBackend:
         self.spawn = spawn
         self.cancel_call = cancel_call
         self.call_state = call_state
+        self._snapshot_lock = threading.Lock()
+        self._snapshot: tuple[float, list[tuple[str, dict]]] | None = None
 
     def put_input(self, data: bytes, content_type: str) -> InputResponse:
         img = decode_image(data)
         # ComfyUI LoadImage 가 바로 읽게 PNG 로 다시 저장한다(투명은 유지)
-        has_alpha = img.mode in ("RGBA", "LA", "PA") or "transparency" in img.info
+        has_alpha = img.mode in ALPHA_MODES or "transparency" in img.info
         img = img.convert("RGBA" if has_alpha else "RGB")
         input_id = str(uuid.uuid4())
         self.inputs_dir.mkdir(parents=True, exist_ok=True)
@@ -64,7 +69,7 @@ class ModalBackend:
     def submit(self, job: JobRequest) -> tuple[JobStatusResponse, bool]:
         existing = self.store.get(job.id)
         if existing is not None:
-            return to_status(existing, queue_position(self.store, existing)), False
+            return status_of(self.store, existing), False
         if job.kind == "edit" and not self._input_exists(str(job.input_id)):
             raise InvalidJob("input_id 를 찾을 수 없어요")
         record = new_record(job, time.time())
@@ -73,15 +78,23 @@ class ModalBackend:
             existing = self.store.get(job.id)
             if existing is None:  # 먼저 만든 요청이 GPU 호출에 실패해 레코드를 지웠다. 앱이 다시 보낸다
                 raise RuntimeError("잡 생성이 겹쳤어요")
-            return to_status(existing, queue_position(self.store, existing)), False
+            return status_of(self.store, existing), False
         try:
             call_id = self.spawn(job.id)
         except Exception:
             # GPU 호출을 걸지 못했으면 레코드를 지워, 같은 id 로 다시 보낼 때 새로 만들고 다시 부르게 한다
             self.store.delete(job.id)
             raise
-        self.store.put_meta(job.id, "call_id", call_id)
-        return to_status(record, queue_position(self.store, record)), True
+        self.store.put_meta(job.id, CALL_ID, call_id)
+        return status_of(self.store, record), True
+
+    def _queue_snapshot(self) -> list[tuple[str, dict]]:
+        """대기 순번을 셀 저장소 스냅샷. QUEUE_SNAPSHOT_TTL_S 안의 요청은 같은 스냅샷을 쓴다(순번이 그만큼 묵을 수 있다)."""
+        with self._snapshot_lock:
+            now = time.monotonic()
+            if self._snapshot is None or now - self._snapshot[0] >= QUEUE_SNAPSHOT_TTL_S:
+                self._snapshot = (now, self.store.items())
+            return self._snapshot[1]
 
     def status(self, job_id: str) -> JobStatusResponse | None:
         record = self.store.get(job_id)
@@ -89,10 +102,11 @@ class ModalBackend:
             return None
         if record["status"] in ACTIVE_STATUSES:
             # GPU 컨테이너가 시간 초과·메모리 부족으로 죽으면 상태를 못 남긴다. 호출이 끝났는데 아직 진행 중이면 실패로 닫는다
-            call_id = self.store.get_meta(job_id, "call_id")
+            call_id = self.store.get_meta(job_id, CALL_ID)
             if call_id and self.call_state(call_id) != "pending":
                 record = self.store.transition(job_id, ACTIVE_STATUSES, status="failed", error=WORKER_DIED_MESSAGE) or self.store.get(job_id) or record
-        return to_status(record, queue_position(self.store, record))
+        # 순번은 대기 중인 잡만 센다. 이때만 스냅샷을 받아, 조회가 몰려도 저장소를 매번 훑지 않는다
+        return status_of(self.store, record, self._queue_snapshot() if record["status"] == "queued" else None)
 
     def output(self, job_id: str) -> bytes | None:
         record = self.store.get(job_id)
@@ -107,7 +121,7 @@ class ModalBackend:
         response = cancel_record(self.store, job_id)
         if response.status == "cancelled":
             # 대기 중이던 GPU 호출도 거둬 컨테이너가 이 잡 때문에 뜨지 않게 한다
-            call_id = self.store.get_meta(job_id, "call_id")
+            call_id = self.store.get_meta(job_id, CALL_ID)
             if call_id:
                 try:
                     self.cancel_call(call_id)

@@ -48,12 +48,14 @@ def set_env_value(path: Path, key: str, value: str) -> None:
     """key 줄을 하나로 바꾼다(첫 자리에 두고 같은 키의 다른 줄·export 줄은 지운다). 없으면 끝에 더하고, 파일이 없으면 만든다."""
     lines = path.read_text("utf-8").splitlines() if path.exists() else []
     out: list[str] = []
+    placed = False
     for line in lines:
         if _key_of(line) != key:
             out.append(line)
-        elif not any(_key_of(kept) == key for kept in out):
+        elif not placed:
             out.append(f"{key}={value}")
-    if not any(_key_of(kept) == key for kept in out):
+            placed = True
+    if not placed:
         out.append(f"{key}={value}")
     path.write_text("\n".join(out) + "\n", "utf-8")
 

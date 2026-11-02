@@ -7,19 +7,11 @@ import subprocess
 
 import modal
 
-from modal_common import app, comfy_image, models_volume
+from modal_common import COMFY_PORT, app, comfy_image, comfy_launch, models_volume
 
 
 @app.function(image=comfy_image, volumes={"/models": models_volume.with_mount_options(read_only=True)}, cpu=2, memory=4096, timeout=3600, scaledown_window=300, max_containers=1)
 @modal.concurrent(max_inputs=10)
-@modal.web_server(8188, startup_timeout=300)
+@modal.web_server(COMFY_PORT, startup_timeout=300)
 def ui() -> None:
-    subprocess.run(
-        [
-            "comfy", "--skip-prompt", "launch", "--background", "--",
-            "--listen", "0.0.0.0", "--port", "8188",
-            "--extra-model-paths-config", "/root/extra_model_paths.yaml",
-            "--cpu", "--disable-auto-launch",
-        ],
-        check=True,
-    )  # fmt: skip
+    subprocess.run(comfy_launch("--listen", "0.0.0.0", "--cpu"), check=True)

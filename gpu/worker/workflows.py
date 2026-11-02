@@ -13,10 +13,9 @@ from .models import TRANSPARENT_PROMPT_PREFIX
 
 BINDINGS_FILE = "bindings.json"
 WORKFLOW_NAME_RE = re.compile(r"[a-z0-9-]+\.json")
-# 바인딩이 꼭 있어야 하는 키. 만들기(입력 이미지 없음)는 크기도 넣는다.
-# 고치기는 입력 이미지 크기를 쓰고, steps 는 없을 수 있다(Qwen 은 ManualSigmas)
-REQUIRED_KEYS = ("prompt", "seed", "filename_prefix")
-GENERATE_REQUIRED_KEYS = ("width", "height")
+# 바인딩이 꼭 있어야 하는 키. 만들기·고치기 모두 결과 크기는 잡의 width·height 를 쓴다.
+# steps 는 없을 수 있다(Qwen 은 ManualSigmas)
+REQUIRED_KEYS = ("prompt", "seed", "filename_prefix", "width", "height")
 
 
 class WorkflowBindingError(ValueError):
@@ -49,7 +48,7 @@ def load_bindings(workflows_dir: Path) -> dict[str, dict[str, list[list[str]]]]:
 def fill_workflow(workflow: dict, binding: dict[str, list[list[str]]], params: FillParams) -> dict:
     if ("image" in binding) != (params.image is not None):
         raise WorkflowBindingError("image 바인딩과 입력 이미지가 맞지 않아요")
-    for key in REQUIRED_KEYS + (GENERATE_REQUIRED_KEYS if params.image is None else ()):
+    for key in REQUIRED_KEYS:
         if key not in binding:
             raise WorkflowBindingError(f"{key} 바인딩이 없어요")
     values = {

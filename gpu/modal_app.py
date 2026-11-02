@@ -14,30 +14,25 @@ import grpclib.exceptions
 import httpx
 import modal
 
-from modal_common import app, comfy_image, data_volume, download_image, models_volume, web_image, worker_secret
+from modal_common import COMFY_PORT, app, comfy_image, comfy_launch, data_volume, download_image, models_volume, web_image, worker_secret
 from worker.api import create_app
+from worker.backend import claim_queued
 from worker.comfy import ComfyClient
 from worker.modal_backend import WORKER_DIED_MESSAGE, CallState, ModalBackend
 from worker.models import all_files
 from worker.runner import run_job
 from worker.schemas import JobRequest
-from worker.state import DictStore
+from worker.state import CANCEL_REQUESTED, DictStore
 
 jobs_dict = modal.Dict.from_name("imagen-local-jobs", create_if_missing=True)
 
 DATA_DIR = Path("/data")
 MODELS_DIR = Path("/models")
 WORKFLOWS_DIR = Path("/root/workflows")
-COMFY_URL = "http://127.0.0.1:8188"
+COMFY_URL = f"http://127.0.0.1:{COMFY_PORT}"
 # ComfyUI 자체의 입출력 폴더는 컨테이너 디스크에 둔다. Volume(/data)에는 러너가 남긴 결과만 올린다
 COMFY_IN, COMFY_OUT = Path("/tmp/comfy/in"), Path("/tmp/comfy/out")
-COMFY_LAUNCH = [
-    "comfy", "--skip-prompt", "launch", "--background", "--",
-    "--listen", "127.0.0.1", "--port", "8188",
-    "--extra-model-paths-config", "/root/extra_model_paths.yaml",
-    "--output-directory", str(COMFY_OUT), "--input-directory", str(COMFY_IN),
-    "--disable-auto-launch",
-]  # fmt: skip
+COMFY_LAUNCH = comfy_launch("--listen", "127.0.0.1", "--output-directory", str(COMFY_OUT), "--input-directory", str(COMFY_IN))
 # ComfyUI 실행 명령과 준비 대기를 합쳐 컨테이너 시작 제한 안에 끝나게 한다(넘으면 Modal 이 원인 없이 컨테이너를 내린다)
 STARTUP_TIMEOUT_S = 600
 COMFY_LAUNCH_TIMEOUT_S = 180
@@ -51,7 +46,7 @@ COMFY_READY_TIMEOUT_S = 400
     startup_timeout=STARTUP_TIMEOUT_S,
     scaledown_window=300,
     max_containers=1,
-    volumes={"/models": models_volume, "/data": data_volume},
+    volumes={MODELS_DIR.as_posix(): models_volume, DATA_DIR.as_posix(): data_volume},
     secrets=[worker_secret],
 )
 class GpuWorker:
@@ -70,15 +65,13 @@ class GpuWorker:
 
     @modal.method()
     def run(self, job_id: str) -> None:
-        record = self.store.get(job_id)
-        if record is None or record["status"] != "queued":
-            return
-        if self.store.get_meta(job_id, "cancel_requested"):
-            self.store.transition(job_id, ("queued",), status="cancelled")
+        record = claim_queued(self.store, job_id)
+        if record is None:
             return
         job = JobRequest.model_validate({key: record[key] for key in JobRequest.model_fields})
-        if job.kind == "edit":
-            data_volume.reload()  # 웹 함수가 받은 입력 이미지를 본다
+        # 웹 함수가 받은 입력 이미지가 아직 안 보일 때만 Volume 을 다시 읽는다(입력은 uuid 파일이라 한번 보이면 바뀌지 않는다)
+        if job.kind == "edit" and not (DATA_DIR / "inputs" / f"{job.input_id}.png").exists():
+            data_volume.reload()
         # 로그에는 잡 id 와 상태만 남긴다(프롬프트 없음)
         print(f"[gpu] job {job_id} start")
         try:
@@ -89,7 +82,7 @@ class GpuWorker:
                 WORKFLOWS_DIR,
                 DATA_DIR / "inputs",
                 DATA_DIR / "outputs",
-                cancel_requested=lambda: bool(self.store.get_meta(job_id, "cancel_requested")),
+                cancel_requested=lambda: bool(self.store.get_meta(job_id, CANCEL_REQUESTED)),
                 commit_output=data_volume.commit,
             )
         finally:
@@ -124,7 +117,7 @@ def _reload_data() -> None:
         print(f"[web] volume reload skipped: {type(e).__name__}")
 
 
-@app.function(image=web_image, volumes={"/data": data_volume}, secrets=[worker_secret], timeout=120)
+@app.function(image=web_image, volumes={DATA_DIR.as_posix(): data_volume}, secrets=[worker_secret], timeout=120)
 @modal.concurrent(max_inputs=100)
 @modal.asgi_app()
 def web():
@@ -140,7 +133,7 @@ def web():
     return create_app(backend, os.environ["GPU_API_TOKEN"])
 
 
-@app.function(image=download_image, volumes={"/models": models_volume}, secrets=[worker_secret], timeout=7200)
+@app.function(image=download_image, volumes={MODELS_DIR.as_posix(): models_volume}, secrets=[worker_secret], timeout=7200)
 def download_models() -> list[str]:
     """빠진 모델 파일만 Hugging Face 에서 받아 Volume 에 넣고, 새로 받은 경로를 돌려준다."""
     # huggingface_hub 는 다운로드 이미지에만 있어 함수 안에서 읽는다(웹·GPU 컨테이너는 이 모듈을 읽어도 이 줄을 돌지 않는다)

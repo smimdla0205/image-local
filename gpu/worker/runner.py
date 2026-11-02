@@ -9,6 +9,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from .backend import ALPHA_MODES
 from .comfy import ComfyClient, ComfyError, ComfyInterrupted, Progress, WsFactory, WsLike, default_ws_factory
 from .models import MODELS
 from .schemas import JobRequest, OutputInfo
@@ -21,7 +22,7 @@ UNEXPECTED_ERROR = "워커에서 오류가 났어요. 다시 생성해 주세요
 
 
 def _has_alpha(img: Image.Image) -> bool:
-    return img.mode in ("RGBA", "LA", "PA") and img.getextrema()[-1][0] < 255
+    return img.mode in ALPHA_MODES and img.getextrema()[-1][0] < 255
 
 
 def _find_output(history: dict) -> dict | None:
@@ -78,7 +79,7 @@ def run_job(
         data = client.fetch_output(found["filename"], found.get("subfolder", ""), found["type"])
         img = Image.open(BytesIO(data))
         img.load()
-        if not job.transparent and img.mode in ("RGBA", "LA", "PA"):
+        if not job.transparent and img.mode in ALPHA_MODES:
             # Qwen 2.1 VAE 는 투명을 요청하지 않아도 RGBA(일부 반투명)를 낸다. 투명 배경을 고르지 않았으면 RGB 로 남긴다
             img = img.convert("RGB")
             buf = BytesIO()
