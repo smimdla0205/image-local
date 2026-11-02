@@ -54,6 +54,17 @@
       "title": "VAE 로드"
     }
   },
+  "459:456": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "빈 잠재 이미지"
+    }
+  },
   "459:457": {
     "inputs": {
       "samples": [
@@ -153,8 +164,8 @@
         0
       ],
       "latent_image": [
-        "459:474",
-        2
+        "459:456",
+        0
       ]
     },
     "class_type": "SamplerCustomAdvanced",
