@@ -2,13 +2,10 @@
 import type { Conversation, Image, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { isModelId, type ModelId } from "@/lib/gpu/models";
-import type { ConversationDetailDto, ConversationDto, ImageDto, JobDto, WorkerState } from "@/lib/jobs/schemas";
+import { type ConversationDetailDto, type ConversationDto, DETAIL_JOB_LIMIT, type ImageDto, type JobDto, type WorkerState } from "@/lib/jobs/schemas";
 
 export const jobInclude = { image: true, inputImage: true } as const satisfies Prisma.JobInclude;
 export type JobWithImages = Prisma.JobGetPayload<{ include: typeof jobInclude }>;
-
-// 화면에 올리는 최근 잡 수(그보다 오래된 잡은 v1 에서 보이지 않는다)
-const DETAIL_JOB_LIMIT = 100;
 
 // DB 의 모델 문자열은 만들 때 검증했다. 그래도 표에 없는 값이면 조용히 바꾸지 않고 오류로 드러낸다
 function toModelId(model: string): ModelId {

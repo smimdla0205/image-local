@@ -140,6 +140,7 @@ class MockBackend:
 
     프롬프트 접두어로 실패를 흉내 낸다: "[fail]" 은 마지막 step 뒤 failed, "[lost]" 는 레코드를 지운다(이후 404),
     "[slow-output]" 은 끝난 뒤 결과를 두 번 '아직 없음'으로 낸다(Modal Volume 반영이 늦는 경우).
+    "[stall]" 은 running·0 step 에 머물다 취소되면 cancelled(GPU 가 늦게 깨는 경우).
     """
 
     name = "mock"
@@ -227,6 +228,14 @@ class MockBackend:
         if self.store.transition(job_id, ("queued",), status="running") is None:
             return
         total = record["total"]
+        prompt: str = record["prompt"]
+        if prompt.startswith("[stall]"):
+            # 0 step 에 머물다 취소되면 끝난다(GPU 가 늦게 깨는 경우를 흉내)
+            while not self._stop.wait(self.step_interval):
+                if self.store.get_meta(job_id, CANCEL_REQUESTED):
+                    self.store.transition(job_id, ("running",), status="cancelled")
+                    return
+            return
         for step in range(1, total + 1):
             if self._stop.wait(self.step_interval):
                 return
@@ -235,7 +244,6 @@ class MockBackend:
                 return
             if self.store.transition(job_id, ("running",), step=step) is None:
                 return
-        prompt: str = record["prompt"]
         if prompt.startswith("[fail]"):
             self.store.transition(job_id, ("running",), status="failed", error="모의 실패예요")
             return

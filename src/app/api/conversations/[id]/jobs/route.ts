@@ -1,8 +1,20 @@
 import { ApiError, handleRoute, parseJsonBody } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { createJobs, submitJobs } from "@/lib/jobs/create";
-import { toJobDto } from "@/lib/jobs/queries";
-import { createJobsBodySchema } from "@/lib/jobs/schemas";
+import { jobInclude, toJobDto } from "@/lib/jobs/queries";
+import { createJobsBodySchema, jobIdsQuerySchema } from "@/lib/jobs/schemas";
+import { syncJobs } from "@/lib/jobs/sync";
+
+// GET /api/conversations/[id]/jobs?ids=… — 물은 잡(이 대화의 것만)을 워커와 맞춰 돌려준다. 대화 화면이 진행 중인 잡만 폴링한다
+export const GET = handleRoute("jobs.sync", async (req, ctx) => {
+  const { id } = await ctx.params;
+  const { ids } = jobIdsQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
+  const conversation = await prisma.conversation.findUnique({ where: { id }, select: { id: true } });
+  if (!conversation) throw new ApiError(404, "conversation_not_found");
+  const jobs = await prisma.job.findMany({ where: { conversationId: id, id: { in: ids } }, include: jobInclude });
+  const synced = await syncJobs(jobs);
+  return Response.json({ jobs: synced.jobs.map(toJobDto), worker: synced.worker });
+});
 
 // POST /api/conversations/[id]/jobs — 대화에 생성·고치기 요청을 더한다(모델은 대화의 모델)
 export const POST = handleRoute("jobs.create", async (req, ctx) => {

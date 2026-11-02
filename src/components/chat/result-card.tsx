@@ -3,6 +3,7 @@
 import { cn } from "cn";
 import { CopyIcon, DownloadIcon, Maximize2Icon, PencilIcon, RefreshCwIcon, WandSparklesIcon } from "lucide-react";
 import Link from "next/link";
+import { memo } from "react";
 import { toast } from "sonner";
 
 import { CompareSlider } from "@/components/chat/compare-slider";
@@ -66,8 +67,22 @@ function DeletedImage() {
   return <div className="grid aspect-square place-items-center rounded-md border border-dashed text-caption text-muted-foreground">삭제한 이미지예요</div>;
 }
 
+type ResultCardProps = { jobs: JobDto[]; model: ModelId } & Handlers;
+
+// 폴링마다 대화가 다시 그려져도 잡 객체(캐시가 바뀌지 않은 잡은 그대로)·핸들러가 같으면 이 카드는 다시 그리지 않는다
+function sameBatch(a: ResultCardProps, b: ResultCardProps): boolean {
+  return (
+    a.model === b.model &&
+    a.onEdit === b.onEdit &&
+    a.onRegenerate === b.onRegenerate &&
+    a.onCancel === b.onCancel &&
+    a.jobs.length === b.jobs.length &&
+    a.jobs.every((j, i) => j === b.jobs[i])
+  );
+}
+
 // 한 요청(배치)의 결과: 배지, 결과 이미지(고치기 1장은 비교 슬라이더), 진행·실패 카드, 다시 생성·프롬프트 복사
-export function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: { jobs: JobDto[]; model: ModelId } & Handlers) {
+export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: ResultCardProps) {
   const first = jobs[0];
   const isEdit = first.kind === "EDIT";
   const active = jobs.filter((j) => isActive(j.status));
@@ -157,4 +172,4 @@ export function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: { jo
       )}
     </section>
   );
-}
+}, sameBatch);

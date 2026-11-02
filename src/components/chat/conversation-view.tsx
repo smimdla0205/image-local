@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components/chat/composer";
@@ -16,12 +16,13 @@ import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { ratioFromSize } from "@/lib/gpu/sizes";
 import { findImage } from "@/lib/jobs/find-image";
-import { type ConversationDetailDto, type JobDto, type JobsCreatedDto, parseId } from "@/lib/jobs/schemas";
+import { type ConversationDetailDto, type ImageDto, type JobDto, type JobsDto, parseId } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 import { queryKeys } from "@/lib/query-keys";
 
-// 진행 중인 잡이 있을 때 대화를 다시 불러오는 간격(GET 이 워커와 맞춘다)
+// 진행 중인 잡이 있을 때 다시 묻는 간격(GET 이 워커와 맞춘다). 생성 중이면 1.5초, 대기만 남았으면 3초
 const POLL_MS = 1500;
+const QUEUED_POLL_MS = 3000;
 
 export function ConversationView({ id, initialData }: { id: string; initialData: ConversationDetailDto }) {
   const queryClient = useQueryClient();
@@ -29,11 +30,32 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const [deleting, setDeleting] = useState(false);
   const query = useQuery({
     queryKey: queryKeys.conversations.detail(id),
-    queryFn: () => apiFetch<ConversationDetailDto>(`/api/conversations/${id}`),
+    // 진행 중인 잡이 있으면 그 잡만 묻고 합친다. 합친 뒤 진행 중인 잡이 없으면(다 끝남) 다른 곳에서 더한 요청까지 보이게 전체를 한 번 받는다
+    queryFn: async () => {
+      const key = queryKeys.conversations.detail(id);
+      const fetchDetail = () => apiFetch<ConversationDetailDto>(`/api/conversations/${id}`);
+      const activeIds = queryClient
+        .getQueryData<ConversationDetailDto>(key)
+        ?.jobs.filter((j) => isActive(j.status))
+        .map((j) => j.id);
+      if (!activeIds?.length) return fetchDetail();
+      const synced = await apiFetch<JobsDto>(`/api/conversations/${id}/jobs?ids=${activeIds.join(",")}`);
+      // 묻는 사이 보낸 요청(setQueryData)을 잃지 않게 응답이 온 뒤의 캐시에 합친다
+      const current = queryClient.getQueryData<ConversationDetailDto>(key);
+      if (!current) return fetchDetail();
+      const byId = new Map(synced.jobs.map((j) => [j.id, j]));
+      const jobs = current.jobs.map((j) => byId.get(j.id) ?? j);
+      if (!jobs.some((j) => isActive(j.status))) return fetchDetail();
+      return { ...current, jobs, worker: synced.worker };
+    },
     initialData,
     staleTime: 0,
     enabled: !deleting,
-    refetchInterval: (q) => (q.state.data?.jobs.some((j) => isActive(j.status)) ? POLL_MS : false),
+    refetchInterval: (q) => {
+      const jobs = q.state.data?.jobs ?? [];
+      if (!jobs.some((j) => isActive(j.status))) return false;
+      return jobs.some((j) => j.status === "RUNNING") ? POLL_MS : QUEUED_POLL_MS;
+    },
   });
   const detail = query.data;
   const model = detail.model as ModelId;
@@ -81,14 +103,18 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     if (t === null && latest) setDismissedBatchId(latest.batchId);
   }
 
-  async function createJobs(body: Omit<ComposerSubmit, "count"> & { count: number }) {
-    const created = await apiFetch<JobsCreatedDto>(`/api/conversations/${id}/jobs`, { method: "POST", json: body });
-    queryClient.setQueryData<ConversationDetailDto>(queryKeys.conversations.detail(id), (old) =>
-      old ? { ...old, jobs: [...old.jobs, ...created.jobs], worker: created.worker } : old,
-    );
-    // 상세는 위에서 바로 채웠고 진행 중인 잡이 있으면 폴링이 다시 불러오므로 목록만 새로 받는다
-    void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
-  }
+  // 결과 카드(ResultCard)는 같은 잡·핸들러면 다시 그리지 않으므로 핸들러를 고정한다
+  const createJobs = useCallback(
+    async (body: Omit<ComposerSubmit, "count"> & { count: number }) => {
+      const created = await apiFetch<JobsDto>(`/api/conversations/${id}/jobs`, { method: "POST", json: body });
+      queryClient.setQueryData<ConversationDetailDto>(queryKeys.conversations.detail(id), (old) =>
+        old ? { ...old, jobs: [...old.jobs, ...created.jobs], worker: created.worker } : old,
+      );
+      // 상세는 위에서 바로 채웠고 진행 중인 잡이 있으면 폴링이 다시 불러오므로 목록만 새로 받는다
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
+    },
+    [id, queryClient],
+  );
 
   async function handleSubmit(d: ComposerSubmit) {
     try {
@@ -102,38 +128,46 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   }
 
   // 같은 프롬프트·장수·투명 배경·고칠 이미지로 다시 만든다(시드는 새로)
-  async function handleRegenerate(jobs: JobDto[]) {
-    const first = jobs[0];
-    try {
-      await createJobs({
-        prompt: first.prompt,
-        ratio: ratioFromSize(first.width, first.height) ?? "1:1",
-        count: jobs.length,
-        transparent: first.transparent,
-        inputImageId: first.inputImage?.id,
-      });
-    } catch (e) {
-      toast.error(errorMessage(e));
-    }
-  }
+  const handleRegenerate = useCallback(
+    async (jobs: JobDto[]) => {
+      const first = jobs[0];
+      try {
+        await createJobs({
+          prompt: first.prompt,
+          ratio: ratioFromSize(first.width, first.height) ?? "1:1",
+          count: jobs.length,
+          transparent: first.transparent,
+          inputImageId: first.inputImage?.id,
+        });
+      } catch (e) {
+        toast.error(errorMessage(e));
+      }
+    },
+    [createJobs],
+  );
 
-  async function handleCancel(jobId: string) {
-    try {
-      await apiFetch(`/api/jobs/${jobId}`, { method: "DELETE" });
-    } catch (e) {
-      // 이미 끝난 잡(409)은 "이미 끝난 작업이에요." 만 알린다
-      toast.error(errorMessage(e));
-    } finally {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
-    }
-  }
+  const handleCancel = useCallback(
+    async (jobId: string) => {
+      try {
+        await apiFetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      } catch (e) {
+        // 이미 끝난 잡(409)은 "이미 끝난 작업이에요." 만 알린다
+        toast.error(errorMessage(e));
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
+      }
+    },
+    [id, queryClient],
+  );
+
+  const handleEdit = useCallback((img: ImageDto) => setManualTarget(toTarget(img)), []);
 
   return (
     <>
       <Topbar title={detail.title ?? "대화"} model={model} actions={<ConversationMenu id={id} onDeletingChange={setDeleting} />} />
       <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-4 pb-6 sm:px-6">
         {!detail.worker.reachable && <WorkerBanner />}
-        <Thread detail={detail} onEdit={(img) => setManualTarget(toTarget(img))} onRegenerate={handleRegenerate} onCancel={handleCancel} />
+        <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} />
         <div ref={endRef} />
       </div>
       <div className="sticky bottom-0 mx-auto w-full max-w-205 bg-background px-4 pb-4 sm:px-6 sm:pb-6">

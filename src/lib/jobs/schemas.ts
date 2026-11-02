@@ -42,6 +42,16 @@ export const imageListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
 });
 
+// 대화 상세에 싣는 최근 잡 수(그보다 오래된 잡은 화면에 오르지 않는다). 진행 중 잡 GET 이 한 번에 물을 수 있는 수도 같다
+export const DETAIL_JOB_LIMIT = 100;
+// GET /api/conversations/[id]/jobs?ids=a,b — 물을 잡 id 를 쉼표로 잇는다
+export const jobIdsQuerySchema = z.object({
+  ids: z
+    .string()
+    .transform((s) => s.split(","))
+    .pipe(z.array(z.string().regex(ID_RE)).min(1).max(DETAIL_JOB_LIMIT)),
+});
+
 // 응답 DTO (날짜는 ISO 문자열)
 export type ImageKindValue = "GENERATED" | "EDITED" | "UPLOADED";
 export type JobStatusValue = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
@@ -91,6 +101,7 @@ export type ConversationDto = { id: string; title: string | null; model: ModelId
 export type WorkerState = { reachable: boolean };
 export type ConversationDetailDto = ConversationDto & { jobs: JobDto[]; worker: WorkerState };
 export type ConversationListDto = { items: ConversationDto[] };
-export type JobsCreatedDto = { jobs: JobDto[]; worker: WorkerState };
+// 잡 묶음 응답: POST /api/conversations/[id]/jobs(만든 잡), GET 같은 경로(물은 진행 중 잡을 워커와 맞춘 것)
+export type JobsDto = { jobs: JobDto[]; worker: WorkerState };
 export type ImageListDto = { items: ImageDto[]; nextCursor: string | null };
 export type ApiErrorBody = { error: { code: string; message: string } };
