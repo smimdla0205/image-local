@@ -55,11 +55,19 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const spec = getModel(model);
 
   // 고칠 이미지: 직접 고른 것(manualTarget) > 최신 요청의 첫 결과(자동 첨부). × 로 뺀 요청은 다시 붙이지 않는다
-  const [manualTarget, setManualTarget] = useState<ComposerTarget | null>(() => {
-    const param = searchParams.get("target");
-    const img = param && ID_RE.test(param) ? findImage(initialData, param) : null;
+  // ?target= 은 처음 열 때뿐 아니라 같은 대화 안에서 바뀔 때(뷰어의 '이어서 고치기')도 반영한다(렌더 중 조정)
+  const targetParam = searchParams.get("target");
+  const targetFromParam = (param: string | null): ComposerTarget | null => {
+    const img = param && ID_RE.test(param) ? findImage(detail, param) : null;
     return img ? toTarget(img) : null;
-  });
+  };
+  const [manualTarget, setManualTarget] = useState<ComposerTarget | null>(() => targetFromParam(targetParam));
+  const [prevTargetParam, setPrevTargetParam] = useState(targetParam);
+  if (prevTargetParam !== targetParam) {
+    setPrevTargetParam(targetParam);
+    const picked = targetFromParam(targetParam);
+    if (picked) setManualTarget(picked);
+  }
   const [dismissedBatchId, setDismissedBatchId] = useState<string | null>(null);
   const latest = groupBatches(detail.jobs).at(-1);
   const latestImage = latest?.jobs.find((j) => j.image)?.image ?? null;

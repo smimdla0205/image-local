@@ -20,6 +20,7 @@ async function ConversationLoader({ params }: { params: Promise<{ id: string }> 
   await connection();
   const data = await getConversationDetail(id);
   if (!data) notFound();
-  // 첫 화면은 DB 기준. 진행 중인 잡이 있으면 클라이언트가 바로 다시 불러 워커와 맞춘다
-  return <ConversationView id={id} initialData={toConversationDetailDto(data.conversation, data.jobs, { reachable: true })} />;
+  // 첫 화면은 DB 기준. 진행 중인 잡이 있으면 클라이언트가 바로 다시 불러 워커와 맞춘다.
+  // key: 다른 대화로 옮기면 고칠 이미지 같은 대화별 상태를 새로 시작한다
+  return <ConversationView key={id} id={id} initialData={toConversationDetailDto(data.conversation, data.jobs, { reachable: true })} />;
 }

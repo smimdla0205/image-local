@@ -70,16 +70,18 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
     e.preventDefault();
     if (!canSubmit) return;
     setBusy(true);
+    const submitted = prompt;
     try {
       await onSubmit({
-        prompt: prompt.trim(),
+        prompt: submitted.trim(),
         ratio,
         count,
         seed: seedState.value,
         transparent: spec.supportsTransparent && transparent,
         inputImageId: target?.imageId,
       });
-      setPrompt("");
+      // 보내는 동안 더 쓴 글은 남긴다(보낸 내용 그대로일 때만 비운다)
+      setPrompt((current) => (current === submitted ? "" : current));
     } catch {
       // 알림은 onSubmit 이 띄웠다. 다시 보낼 수 있게 입력은 그대로 둔다
     } finally {
