@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { Providers } from "@/components/providers";
+import { AppShell } from "@/components/shell/app-shell";
 import "./globals.css";
 
 // 디자인 시스템 글꼴. globals.css 의 --font-sans 가 Inter, Pretendard 순서로 쌓아 영문·숫자는 Inter, 한글은 Pretendard 로 그린다
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${pretendard.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );

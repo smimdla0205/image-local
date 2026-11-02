@@ -1,0 +1,136 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { ImagesIcon, SquarePenIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Suspense } from "react";
+
+import { groupByDay } from "@/components/shell/day-groups";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { apiFetch } from "@/lib/api-client";
+import type { ConversationListDto } from "@/lib/jobs/schemas";
+import { queryKeys } from "@/lib/query-keys";
+
+function Brand() {
+  return (
+    <Link href="/" className="rounded-md px-2 text-base font-bold tracking-tight outline-none focus-visible:shadow-focus-ring">
+      imagen-local
+    </Link>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 px-2" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => (
+        <Skeleton key={i} className="h-8" />
+      ))}
+    </div>
+  );
+}
+
+// 대화 목록. 날짜 묶음은 데이터가 온 뒤 브라우저 시간으로 계산한다(서버 렌더는 스켈레톤)
+function ConversationList() {
+  const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+  const list = useQuery({ queryKey: queryKeys.conversations.list(), queryFn: () => apiFetch<ConversationListDto>("/api/conversations") });
+
+  if (list.isPending) return <ListSkeleton />;
+  if (list.isError) return <p className="px-2 text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
+  if (list.data.items.length === 0) return <p className="px-2 text-caption text-muted-foreground">아직 대화가 없어요</p>;
+  return (
+    <>
+      {groupByDay(list.data.items, new Date()).map((group) => (
+        <section key={group.label} className="flex flex-col gap-0.5">
+          <h2 className="px-2 pb-1 text-micro text-muted-foreground">{group.label}</h2>
+          <ul className="flex flex-col gap-0.5">
+            {group.items.map((c) => {
+              const href = `/c/${c.id}`;
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={href}
+                    aria-current={pathname === href ? "page" : undefined}
+                    onClick={() => setOpenMobile(false)}
+                    className="flex min-h-9 items-center gap-2.5 rounded-md px-2 py-1.5 text-label font-normal outline-none hover:bg-sidebar-accent focus-visible:shadow-focus-ring aria-[current=page]:bg-sidebar-accent max-md:min-h-11"
+                  >
+                    {c.thumbUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 512px WebP 썸네일
+                      <img src={c.thumbUrl} alt="" width={24} height={24} className="size-6 shrink-0 rounded-sm bg-secondary object-cover" />
+                    ) : (
+                      <span aria-hidden="true" className="size-6 shrink-0 rounded-sm bg-secondary" />
+                    )}
+                    <span className="min-w-0 truncate">{c.title ?? "제목 없음"}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </>
+  );
+}
+
+// 현재 경로를 보는 링크들. usePathname 은 동적 경로(/c/[id])의 미리 렌더링에서 Suspense 가 필요하다
+function SidebarNav() {
+  const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+  const close = () => setOpenMobile(false);
+  return (
+    <>
+      <nav aria-label="바로가기" className="px-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton isActive={pathname === "/"} aria-current={pathname === "/" ? "page" : undefined} render={<Link href="/" onClick={close} />} className="max-md:h-11">
+              <SquarePenIcon aria-hidden="true" />
+              새 대화
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/gallery"}
+              aria-current={pathname === "/gallery" ? "page" : undefined}
+              render={<Link href="/gallery" onClick={close} />}
+              className="max-md:h-11"
+            >
+              <ImagesIcon aria-hidden="true" />
+              갤러리
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </nav>
+      <nav aria-label="대화 목록" className="flex flex-col gap-4 px-2">
+        <ConversationList />
+      </nav>
+    </>
+  );
+}
+
+// 사이드바 틀은 Suspense 밖에 둔다. SidebarProvider 와 같은 hydration 단계에 그려야 모바일 판정(isMobile)이 서버 HTML 과 어긋나지 않는다
+export function AppSidebar() {
+  return (
+    <Sidebar>
+      <SidebarHeader className="flex-row items-center justify-between">
+        <Brand />
+        <SidebarTrigger aria-label="사이드바 접기" className="max-md:hidden" />
+      </SidebarHeader>
+      <SidebarContent className="gap-4 pb-3">
+        <Suspense fallback={<ListSkeleton />}>
+          <SidebarNav />
+        </Suspense>
+      </SidebarContent>
+    </Sidebar>
+  );
+}

@@ -159,8 +159,31 @@
   }
   body {
     @apply bg-background text-body text-foreground;
+    /* 한국어는 어절 단위로 줄을 바꾸고, 띄어쓰기 없는 긴 영문·URL 은 아무 데서나 끊는다 */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
   html {
     @apply font-sans;
   }
+}
+
+/* 이미지 위 액션 버튼: 마우스는 hover·포커스 때, 터치 기기(hover 없음)는 항상 보인다 */
+.hover-actions {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.group:hover .hover-actions,
+.group:focus-within .hover-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hover-actions {
+    opacity: 1;
+  }
+}
+
+/* 투명 배경(alpha) 이미지 뒤의 바둑판 */
+.checker {
+  background: repeating-conic-gradient(var(--color-muted) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
 }
