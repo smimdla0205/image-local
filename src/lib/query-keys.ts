@@ -5,6 +5,7 @@ export const queryKeys = {
   conversations: {
     all: ["conversations"] as const,
     list: () => ["conversations", "list"] as const,
+    details: ["conversations", "detail"] as const,
     detail: (id: string) => ["conversations", "detail", id] as const,
   },
   jobs: {
@@ -12,6 +13,7 @@ export const queryKeys = {
   },
   images: {
     all: ["images"] as const,
+    lists: ["images", "list"] as const,
     list: (f: { q?: string; model?: ModelId }) => ["images", "list", f] as const,
     detail: (id: string) => ["images", "detail", id] as const,
   },

@@ -194,6 +194,7 @@
 }
 
 /* 이미지를 받는 동안: 이미지는 투명하고 자리(.image-frame, muted)는 은은하게 깜빡인다. 다 받으면 짧게 나타난다(FadeImage).
+   깜빡임은 틀 위 의사 요소의 opacity 로 해 합성 단계에서 돈다(화면 밖 지연 로딩 틀이 많아도 가볍다).
    한 틀에 겹친 여러 장(비교 슬라이더, .image-frame-together)은 모두 받은 뒤 함께 보인다. 움직임 줄이기면 바로 바꾼다 */
 img[data-loading] {
   opacity: 0;
@@ -201,22 +202,35 @@ img[data-loading] {
 .fade-image {
   transition: opacity 150ms ease-out;
 }
-.image-frame:has(img[data-loading]) {
+.image-frame {
+  position: relative;
+}
+.image-frame:has(img[data-loading])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--secondary);
+  opacity: 0;
+  pointer-events: none;
   animation: image-loading 1.6s ease-in-out infinite;
 }
 .image-frame-together:has(img[data-loading]) img {
   opacity: 0;
 }
+/* 뷰어: 큰 이미지를 받는 동안만 같은 자리에 썸네일(--thumb)을 깔아 둔다(다 받으면 걷어 내 투명 배경 뒤로 비치지 않게) */
+.thumb-under:has(img[data-loading]) {
+  background-image: var(--thumb);
+}
 @keyframes image-loading {
   50% {
-    background-color: var(--secondary);
+    opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .fade-image {
     transition: none;
   }
-  .image-frame:has(img[data-loading]) {
+  .image-frame:has(img[data-loading])::before {
     animation: none;
   }
 }

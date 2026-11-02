@@ -4,6 +4,7 @@ import { type InfiniteData, type QueryClient, useQuery, useQueryClient } from "@
 import { cn } from "cn";
 import { XIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { CSSProperties } from "react";
 import { toast } from "sonner";
 
 import { ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
@@ -13,17 +14,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
 import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { findImage } from "@/lib/jobs/find-image";
-import { type ConversationDetailDto, type ConversationListDto, type ImageDto, type ImageListDto, parseId } from "@/lib/jobs/schemas";
+import { type ConversationDetailDto, type ImageDto, type ImageListDto, parseId } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
 // 캐시에 있는 갤러리 목록과 대화 상세에서 같은 id 의 이미지를 찾는다
 function findCachedImage(queryClient: QueryClient, id: string): ImageDto | undefined {
-  for (const [, data] of queryClient.getQueriesData<InfiniteData<ImageListDto> | ImageDto>({ queryKey: queryKeys.images.all })) {
-    const hit = data && "pages" in data ? data.pages.flatMap((p) => p.items).find((i) => i.id === id) : undefined;
+  for (const [, data] of queryClient.getQueriesData<InfiniteData<ImageListDto>>({ queryKey: queryKeys.images.lists })) {
+    const hit = data?.pages.flatMap((p) => p.items).find((i) => i.id === id);
     if (hit) return hit;
   }
-  for (const [, data] of queryClient.getQueriesData<ConversationDetailDto | ConversationListDto>({ queryKey: queryKeys.conversations.all })) {
-    const hit = data && "jobs" in data ? findImage(data, id) : null;
+  for (const [, data] of queryClient.getQueriesData<ConversationDetailDto>({ queryKey: queryKeys.conversations.details })) {
+    const hit = data ? findImage(data, id) : null;
     if (hit) return hit;
   }
   return undefined;
@@ -87,8 +88,11 @@ export function ImageViewerDialog() {
           </p>
         ) : (
           <div className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            {/* 큰 이미지를 받는 동안 이미 받아 둔 썸네일을 같은 자리에 깔아 둔다 */}
-            <div className="image-frame self-start rounded-md bg-muted bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${image.data.thumbUrl})` }}>
+            {/* 큰 이미지를 받는 동안 이미 받아 둔 썸네일을 같은 자리에 깔아 둔다(thumb-under) */}
+            <div
+              className="thumb-under self-start rounded-md bg-muted bg-contain bg-center bg-no-repeat"
+              style={{ "--thumb": `url(${JSON.stringify(image.data.thumbUrl)})` } as CSSProperties}
+            >
               <FadeImage
                 src={image.data.previewUrl}
                 alt={image.data.prompt ?? "올린 사진"}
