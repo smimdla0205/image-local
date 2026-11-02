@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 
+import { FadeImage } from "@/components/fade-image";
 import { groupByDay } from "@/components/shell/day-groups";
 import {
   Sidebar,
@@ -68,8 +69,10 @@ function ConversationList() {
                     className="flex min-h-9 items-center gap-2.5 rounded-md px-2 py-1.5 text-label font-normal outline-none hover:bg-sidebar-accent focus-visible:shadow-focus-ring aria-[current=page]:bg-sidebar-accent max-md:min-h-11"
                   >
                     {c.thumbUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 512px WebP 썸네일
-                      <img src={c.thumbUrl} alt="" width={24} height={24} className="size-6 shrink-0 rounded-sm bg-secondary object-cover" />
+                      // 대화가 많으면 목록 아래쪽 썸네일은 보일 때 받는다
+                      <span className="image-frame size-6 shrink-0 overflow-hidden rounded-sm bg-muted">
+                        <FadeImage src={c.thumbUrl} alt="" width={24} height={24} loading="lazy" decoding="async" className="size-full object-cover" />
+                      </span>
                     ) : (
                       <span aria-hidden="true" className="size-6 shrink-0 rounded-sm bg-secondary" />
                     )}

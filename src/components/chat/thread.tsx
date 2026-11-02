@@ -1,6 +1,7 @@
 "use client";
 
 import { ResultCard } from "@/components/chat/result-card";
+import { FadeImage } from "@/components/fade-image";
 import type { ModelId } from "@/lib/gpu/models";
 import type { ConversationDetailDto, ImageDto, JobDto } from "@/lib/jobs/schemas";
 
@@ -22,9 +23,8 @@ function UserBubble({ job }: { job: JobDto }) {
     <div className="flex flex-col items-end gap-2">
       {job.kind === "EDIT" &&
         (job.inputImage ? (
-          <figure className="relative m-0 w-24 overflow-hidden rounded-md bg-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 512px WebP 썸네일 */}
-            <img src={job.inputImage.thumbUrl} alt={`고칠 이미지: 버전 ${job.inputImage.version}`} className="block aspect-square w-full object-cover" />
+          <figure className="image-frame relative m-0 w-24 overflow-hidden rounded-md bg-muted">
+            <FadeImage src={job.inputImage.thumbUrl} alt={`고칠 이미지: 버전 ${job.inputImage.version}`} decoding="async" className="block aspect-square w-full object-cover" />
             <figcaption className="absolute bottom-1 left-1 rounded-sm bg-overlay px-1.5 text-micro text-overlay-foreground">버전 {job.inputImage.version}</figcaption>
           </figure>
         ) : (

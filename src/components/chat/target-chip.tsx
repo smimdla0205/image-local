@@ -3,6 +3,7 @@
 import { XIcon } from "lucide-react";
 
 import { ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
+import { FadeImage } from "@/components/fade-image";
 import type { ImageDto } from "@/lib/jobs/schemas";
 
 // 고칠 이미지(입력창 위). label: '버전 n' | '올린 사진'
@@ -15,8 +16,9 @@ export function toTarget(img: ImageDto): ComposerTarget {
 export function TargetChip({ target, onRemove }: { target: ComposerTarget; onRemove: () => void }) {
   return (
     <div className="flex items-center gap-3 rounded-md bg-muted p-1 pr-2">
-      {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 썸네일(이미 512px WebP)이라 next/image 최적화가 필요 없다 */}
-      <img src={target.thumbUrl} alt="" width={48} height={48} className="size-12 shrink-0 rounded-sm object-cover" />
+      <span className="image-frame size-12 shrink-0 overflow-hidden rounded-sm bg-muted">
+        <FadeImage src={target.thumbUrl} alt="" width={48} height={48} decoding="async" className="size-full object-cover" />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-label">고칠 이미지</p>
         <p className="text-caption text-muted-foreground">{target.label}</p>
