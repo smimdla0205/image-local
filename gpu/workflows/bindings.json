@@ -1,0 +1,168 @@
+{
+  "klein-generate.json": {
+    "prompt": [
+      [
+        "18:17",
+        "value"
+      ]
+    ],
+    "seed": [
+      [
+        "18:7",
+        "seed"
+      ]
+    ],
+    "steps": [
+      [
+        "18:7",
+        "steps"
+      ]
+    ],
+    "width": [
+      [
+        "18:6",
+        "width"
+      ]
+    ],
+    "height": [
+      [
+        "18:6",
+        "height"
+      ]
+    ],
+    "filename_prefix": [
+      [
+        "9",
+        "filename_prefix"
+      ]
+    ]
+  },
+  "klein-edit.json": {
+    "prompt": [
+      [
+        "47",
+        "prompt"
+      ]
+    ],
+    "seed": [
+      [
+        "7",
+        "seed"
+      ]
+    ],
+    "steps": [
+      [
+        "7",
+        "steps"
+      ]
+    ],
+    "image": [
+      [
+        "11",
+        "image"
+      ]
+    ],
+    "filename_prefix": [
+      [
+        "9",
+        "filename_prefix"
+      ]
+    ]
+  },
+  "qwen-turbo-generate.json": {
+    "prompt": [
+      [
+        "459:452",
+        "prompt"
+      ]
+    ],
+    "seed": [
+      [
+        "459:488",
+        "noise_seed"
+      ]
+    ],
+    "width": [
+      [
+        "459:456",
+        "width"
+      ]
+    ],
+    "height": [
+      [
+        "459:456",
+        "height"
+      ]
+    ],
+    "filename_prefix": [
+      [
+        "461",
+        "filename_prefix"
+      ]
+    ]
+  },
+  "qwen-turbo-edit.json": {
+    "prompt": [
+      [
+        "459:474",
+        "prompt"
+      ]
+    ],
+    "seed": [
+      [
+        "459:504",
+        "noise_seed"
+      ]
+    ],
+    "image": [
+      [
+        "470",
+        "image"
+      ]
+    ],
+    "filename_prefix": [
+      [
+        "461",
+        "filename_prefix"
+      ]
+    ]
+  },
+  "moss-generate.json": {
+    "prompt": [
+      [
+        "18:17",
+        "value"
+      ]
+    ],
+    "seed": [
+      [
+        "18:7",
+        "seed"
+      ]
+    ],
+    "steps": [
+      [
+        "18:7",
+        "steps"
+      ]
+    ],
+    "width": [
+      [
+        "18:6",
+        "width"
+      ]
+    ],
+    "height": [
+      [
+        "18:6",
+        "height"
+      ]
+    ],
+    "filename_prefix": [
+      [
+        "9",
+        "filename_prefix"
+      ]
+    ]
+  }
+}

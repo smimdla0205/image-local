@@ -1,0 +1,180 @@
+{
+  "461": {
+    "inputs": {
+      "filename_prefix": "Qwen_image_2.1",
+      "format": "png",
+      "format.bit_depth": "8-bit",
+      "format.input_color_space": "sRGB",
+      "images": [
+        "459:457",
+        0
+      ]
+    },
+    "class_type": "SaveImageAdvanced",
+    "_meta": {
+      "title": "이미지 저장 (고급)"
+    }
+  },
+  "459:451": {
+    "inputs": {
+      "unet_name": "qwen_image_2.1_turbo_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "확산 모델 로드"
+    }
+  },
+  "459:452": {
+    "inputs": {
+      "prompt": "Underground techno event poster: black background, a two-line headline in heavy white grotesque capitals where the first line reads \"QWEN IMAGE\" and the second line reads \"2.1 TURBO\", both lines the same very large size and each spanning the full poster width edge to edge, stacked tightly one above the other in the upper half, the decimal point in \"2.1\" rendered as a clearly visible full-size square dot, a scattered pile of overlapping black-and-white halftone portrait photos showing a mixed cast of different people, an elderly man, a young woman, a child and a bearded man among them, arranged in two loose rows across the lower half, every face is razor sharp and crisply in focus with fine detailed halftone dots, high micro-contrast, thin white grid lines, small fluorescent orange accent shapes, two-colour risograph print texture, square 1:1 poster format, both headline lines equally prominent, spelling exactly correct letter by letter, no other readable words, no watermark",
+      "negative_prompt": "",
+      "resolution": 1024,
+      "clip": [
+        "459:453",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImage21",
+    "_meta": {
+      "title": "텍스트 인코드 Qwen Image 2.1"
+    }
+  },
+  "459:453": {
+    "inputs": {
+      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP 로드"
+    }
+  },
+  "459:454": {
+    "inputs": {
+      "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE 로드"
+    }
+  },
+  "459:456": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "빈 잠재 이미지"
+    }
+  },
+  "459:457": {
+    "inputs": {
+      "samples": [
+        "459:486",
+        0
+      ],
+      "vae": [
+        "459:454",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE 디코드"
+    }
+  },
+  "459:484": {
+    "inputs": {
+      "sigmas": "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "Manual Sigmas (Qwen-Image-2.1-Turbo 8-step schedule)"
+    }
+  },
+  "459:486": {
+    "inputs": {
+      "noise": [
+        "459:488",
+        0
+      ],
+      "guider": [
+        "459:489",
+        0
+      ],
+      "sampler": [
+        "459:487",
+        0
+      ],
+      "sigmas": [
+        "459:484",
+        0
+      ],
+      "latent_image": [
+        "459:456",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "Sampler Custom Advanced"
+    }
+  },
+  "459:487": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSampler Select (euler)"
+    }
+  },
+  "459:488": {
+    "inputs": {
+      "noise_seed": 531123706903762
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "Random Noise"
+    }
+  },
+  "459:489": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "459:490",
+        0
+      ],
+      "positive": [
+        "459:452",
+        0
+      ],
+      "negative": [
+        "459:452",
+        1
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG 가이드"
+    }
+  },
+  "459:490": {
+    "inputs": {
+      "device": "auto",
+      "dtype": "default",
+      "model": [
+        "459:451",
+        0
+      ]
+    },
+    "class_type": "QwenImage21Cache",
+    "_meta": {
+      "title": "Qwen Image 2.1 캐시"
+    }
+  }
+}
