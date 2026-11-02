@@ -1,0 +1,23 @@
+# 의존성
+node_modules/
+
+# Next.js 빌드 산출물
+.next/
+out/
+build/
+coverage/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+
+# Prisma 생성 클라이언트·로컬 DB
+src/generated/
+dev.db*
+
+# 비밀값 (.env.example 은 커밋)
+.env
+.env.*
+!.env.example
+
+# 테스트 산출물 (테스트는 상위 AI/tests 에 있음)
+coverage/

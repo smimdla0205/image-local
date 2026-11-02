@@ -1,0 +1,54 @@
+// Prisma 7 스키마. 개발은 SQLite, 운영 DB 로 옮길 때 datasource provider 만 바꾼다.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 인증(Auth.js 등)을 붙이기 전까지 대화는 사용자 없이도 만들 수 있다
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  createdAt     DateTime       @default(now())
+  conversations Conversation[]
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  title     String?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs      Job[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+// 이미지 생성 요청 하나. GPU 워커가 끝나면 webhook 으로 status 와 결과를 채운다
+model Job {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  model          String // src/lib/gpu/models.ts 의 모델 id
+  prompt         String
+  status         JobStatus    @default(QUEUED)
+  imageUrl       String?
+  error          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId, createdAt])
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}

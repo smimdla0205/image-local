@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * 디자인 시스템(imagen-local 디자인 시스템) 토큰을 shadcn 변수에 연결한다.
+ * 값의 근거와 쓰임 규칙은 디자인 시스템 README 를 따른다: CLAUDE.md 의 디자인 시스템 항목 참고.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  /* 영문·숫자는 Inter, 한글은 Pretendard 로 그려진다. 스택 순서가 역할을 나눈다 (layout.tsx 에서 불러온다) */
+  --font-sans: var(--font-inter), var(--font-pretendard), "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* shadcn 에 없는 디자인 시스템 색. bg-signal, text-signal-foreground, bg-overlay 처럼 쓴다 */
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-subtle: var(--signal-subtle);
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
+  /* 디자인 시스템 그림자: shadow-composer, shadow-popover, shadow-focus-ring */
+  --shadow-composer: var(--shadow-composer);
+  --shadow-popover: var(--shadow-popover);
+  --shadow-focus-ring: var(--shadow-focus-ring);
+  /* --radius 는 디자인 시스템 radius-md(10px). rounded-sm 이 radius-sm(6px), rounded-lg 가 radius-md, rounded-xl 이 radius-lg(16px) 다 */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.6);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* 디자인 시스템 글자 스타일: text-display, text-title, text-body, text-label, text-caption, text-micro */
+@theme {
+  --text-display: 28px;
+  --text-display--line-height: 36px;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 700;
+  --text-title: 18px;
+  --text-title--line-height: 26px;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 24px;
+  --text-label: 14px;
+  --text-label--line-height: 20px;
+  --text-label--font-weight: 500;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-micro: 12px;
+  --text-micro--line-height: 16px;
+  --text-micro--font-weight: 500;
+}
+
+/* 라이트 테마. var() 로 다른 토큰을 가리키는 변수는 .dark 에서 따로 쓰지 않아도 다크 값을 따라간다 */
+:root {
+  --background: #ffffff;
+  --foreground: #141416;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: #ededef;
+  --secondary-foreground: var(--foreground);
+  --muted: #f6f6f7;
+  --muted-foreground: #67676f;
+  --accent: var(--secondary);
+  --accent-foreground: var(--foreground);
+  --destructive: #cf2a1e;
+  --border: #e4e4e7;
+  --input: #8a8a93;
+  --ring: var(--signal);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 10px;
+  --sidebar: #f6f6f7;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: #eaeaed;
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --signal: #2e3be0;
+  --signal-foreground: #ffffff;
+  --signal-subtle: #eceeff;
+  --overlay: #0c0c0eb8;
+  --overlay-foreground: #ffffff;
+  --shadow-composer: 0 1px 2px #14141614, 0 8px 24px -8px #14141629;
+  --shadow-popover: 0 2px 6px #1414161a, 0 16px 40px -12px #14141640;
+  /* 바탕색 2px 틈 뒤에 signal 2px 링 */
+  --shadow-focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--signal);
+}
+
+/* 다크 테마. next-themes 가 html 에 .dark 를 붙인다 */
+.dark {
+  --background: #161618;
+  --foreground: #ededef;
+  --card: #1e1e21;
+  --secondary: #2a2a2e;
+  --muted: #1e1e21;
+  --muted-foreground: #a1a1aa;
+  --destructive: #ff6b5e;
+  --border: #303035;
+  --input: #6e6e77;
+  --sidebar: #1a1a1d;
+  --sidebar-accent: #26262a;
+  --signal: #7480ff;
+  --signal-foreground: #0b0c1f;
+  --signal-subtle: #1e2040;
+  --overlay: #000000b8;
+  --shadow-composer: 0 1px 2px #00000080, 0 8px 24px -8px #000000b3;
+  --shadow-popover: 0 2px 6px #00000099, 0 16px 40px -12px #000000cc;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-body text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
