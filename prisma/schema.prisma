@@ -21,29 +21,84 @@ model User {
 model Conversation {
   id        String   @id @default(cuid())
   title     String?
+  // 'klein' | 'qwen-turbo' | 'moss' (src/lib/gpu/models.ts). 대화 단위로 고정하고 잡은 이 값을 따른다
+  model     String
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobs      Job[]
+  images    Image[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, updatedAt])
+  @@index([updatedAt])
 }
 
-// 이미지 생성 요청 하나. GPU 워커가 끝나면 webhook 으로 status 와 결과를 채운다
+// 이미지 생성 요청 하나(잡 1개 = 이미지 1장). 앱이 GPU 워커를 폴링해 status·step·결과를 채운다
 model Job {
   id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  model          String // src/lib/gpu/models.ts 의 모델 id
+  // 대화 모델의 복사본
+  model          String
+  kind           JobKind      @default(GENERATE)
+  // 한 요청(장수 n)의 잡 묶음 = 대화 스레드의 turn 하나
+  batchId        String
   prompt         String
+  width          Int
+  height         Int
+  // 0..2147483647
+  seed           Int
+  steps          Int
+  transparent    Boolean      @default(false)
+  // 이어서 고치기의 입력 이미지. 그 이미지를 지우면 null
+  inputImageId   String?
+  inputImage     Image?       @relation("JobInput", fields: [inputImageId], references: [id], onDelete: SetNull)
+  image          Image?       @relation("JobOutput")
   status         JobStatus    @default(QUEUED)
-  imageUrl       String?
+  step           Int          @default(0)
+  queuePosition  Int?
   error          String?
+  // 워커 POST /jobs 가 성공한 시각. null 이면 다음 동기화 때 다시 제출한다
+  submittedAt    DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([conversationId, createdAt])
+  @@index([status])
+  @@index([inputImageId])
+  @@index([conversationId, batchId])
+}
+
+// 만든 이미지·고친 이미지·올린 사진. 파일은 STORAGE_DIR 의 images/<id>.png, thumbs/<id>.webp
+model Image {
+  id             String        @id @default(cuid())
+  kind           ImageKind
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  jobId          String?       @unique
+  job            Job?          @relation("JobOutput", fields: [jobId], references: [id], onDelete: Cascade)
+  // 올린 사진은 null
+  model          String?
+  prompt         String?
+  seed           Int?
+  steps          Int?
+  width          Int
+  height         Int
+  hasAlpha       Boolean       @default(false)
+  bytes          Int
+  // 생성은 1, 고칠 때마다 입력 버전 + 1
+  version        Int           @default(1)
+  parentId       String?
+  parent         Image?        @relation("ImageVersions", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Image[]       @relation("ImageVersions")
+  inputFor       Job[]         @relation("JobInput")
+  createdAt      DateTime      @default(now())
+
+  @@index([kind, createdAt])
+  @@index([model, createdAt])
+  @@index([conversationId])
+  @@index([parentId])
 }
 
 enum JobStatus {
@@ -51,4 +106,16 @@ enum JobStatus {
   RUNNING
   SUCCEEDED
   FAILED
+  CANCELLED
+}
+
+enum JobKind {
+  GENERATE
+  EDIT
+}
+
+enum ImageKind {
+  GENERATED
+  EDITED
+  UPLOADED
 }
