@@ -1,5 +1,6 @@
 import { ApiError, handleRoute } from "@/lib/api/errors";
-import { isStorageKind, readFile, resolveStoragePath, type StorageKind, storageKey } from "@/lib/storage";
+import { makePreview } from "@/lib/images/normalize";
+import { isStorageKind, putFile, readFile, resolveStoragePath, type StorageKind, storageKey } from "@/lib/storage";
 
 const CONTENT_TYPE = { images: "image/png", thumbs: "image/webp", previews: "image/webp" } as const;
 
@@ -18,17 +19,19 @@ export const GET = handleRoute("files.get", async (_req, ctx) => {
   const { kind, file } = await ctx.params;
   if (!isStorageKind(kind) || !resolveStoragePath(kind, file)) throw new ApiError(404, "not_found");
   const id = file.slice(0, file.lastIndexOf("."));
-  let served: StorageKind = kind;
   let data = await readStored(kind, id);
-  // 화면용 미리보기가 생기기 전에 저장된 이미지는 원본 PNG 로 대신한다
+  // 화면용 미리보기가 생기기 전에 저장된 이미지는 처음 요청할 때 원본으로 만들어 둔다(다음부터는 저장된 파일)
   if (!data && kind === "previews") {
-    served = "images";
-    data = await readStored("images", id);
+    const png = await readStored("images", id);
+    if (png) {
+      data = (await makePreview(png)) as Uint8Array<ArrayBuffer>;
+      await putFile(storageKey("previews", id), data);
+    }
   }
   if (!data) throw new ApiError(404, "not_found");
   return new Response(data, {
     headers: {
-      "Content-Type": CONTENT_TYPE[served],
+      "Content-Type": CONTENT_TYPE[kind],
       "Content-Length": String(data.byteLength),
       "Cache-Control": "private, max-age=31536000, immutable",
     },

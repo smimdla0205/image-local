@@ -56,11 +56,10 @@ export async function deleteFile(key: string): Promise<void> {
   await fs.rm(keyPath(key), { force: true });
 }
 
-// 이미지 한 장의 원본(PNG)·썸네일·화면용 미리보기를 쓴다(원본 먼저)
+// 이미지 한 장의 원본(PNG)·썸네일·화면용 미리보기를 쓴다(원본 먼저, 나머지 둘은 함께)
 export async function putImageFiles(id: string, png: Uint8Array, thumb: Uint8Array, preview: Uint8Array): Promise<void> {
   await putFile(storageKey("images", id), png);
-  await putFile(storageKey("thumbs", id), thumb);
-  await putFile(storageKey("previews", id), preview);
+  await Promise.all([putFile(storageKey("thumbs", id), thumb), putFile(storageKey("previews", id), preview)]);
 }
 
 // 세 파일을 함께 지운다. 하나가 실패해도 나머지는 지우고, 오류는 던지지 않는다
