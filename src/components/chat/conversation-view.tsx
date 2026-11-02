@@ -15,20 +15,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { ratioFromSize } from "@/lib/gpu/sizes";
-import { type ConversationDetailDto, type ImageDto, type JobDto, type JobsCreatedDto, parseId } from "@/lib/jobs/schemas";
+import { findImage } from "@/lib/jobs/find-image";
+import { type ConversationDetailDto, type JobDto, type JobsCreatedDto, parseId } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 import { queryKeys } from "@/lib/query-keys";
 
 // 진행 중인 잡이 있을 때 대화를 다시 불러오는 간격(GET 이 워커와 맞춘다)
 const POLL_MS = 1500;
-
-function findImage(detail: ConversationDetailDto, id: string): ImageDto | null {
-  for (const j of detail.jobs) {
-    if (j.image?.id === id) return j.image;
-    if (j.inputImage?.id === id) return j.inputImage;
-  }
-  return null;
-}
 
 export function ConversationView({ id, initialData }: { id: string; initialData: ConversationDetailDto }) {
   const queryClient = useQueryClient();

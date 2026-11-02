@@ -3,23 +3,22 @@
 import { ChevronsLeftRightIcon } from "lucide-react";
 import { useId, useState } from "react";
 
+import { FadeImage } from "@/components/fade-image";
 import type { ImageDto } from "@/lib/jobs/schemas";
 
 // 고치기 전(왼쪽)과 후(오른쪽)를 겹쳐 놓고 경계선을 움직여 비교한다. 투명한 range 입력이 위를 덮어 키보드(화살표)로도 움직인다.
-// 입력이 투명하므로 키보드 포커스는 바깥 틀의 포커스 링으로 보여 준다
+// 입력이 투명하므로 키보드 포커스는 바깥 틀의 포커스 링으로 보여 준다. 두 장은 다 받은 뒤 함께 보인다(image-frame-together)
 export function CompareSlider({ before, after }: { before: ImageDto; after: ImageDto }) {
   const [pos, setPos] = useState(50);
   const id = useId();
   return (
     <div
       data-testid="compare-slider"
-      className="relative w-full overflow-hidden rounded-md bg-muted has-focus-visible:shadow-focus-ring"
+      className="image-frame image-frame-together relative w-full overflow-hidden rounded-md bg-muted has-focus-visible:shadow-focus-ring"
       style={{ aspectRatio: `${after.width} / ${after.height}` }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 화면용 WebP(원본 크기)라 next/image 최적화가 필요 없다 */}
-      <img src={after.previewUrl} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
-      {/* eslint-disable-next-line @next/next/no-img-element -- 위와 같다 */}
-      <img
+      <FadeImage src={after.previewUrl} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      <FadeImage
         src={before.previewUrl}
         alt={`버전 ${before.version}`}
         loading="lazy"
