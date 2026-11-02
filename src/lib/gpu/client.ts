@@ -75,6 +75,36 @@ async function httpError(res: Response): Promise<WorkerError> {
   return parsed.success ? new WorkerError("http", res.status, parsed.data.error.code, parsed.data.error.message) : new WorkerError("http", res.status);
 }
 
+// 본문을 조각마다 세며 읽어 상한을 넘는 순간 멈춘다. 읽는 도중 끊기거나 시간이 다 되면 워커 사용 불가 오류로 바꾼다
+async function readLimited(res: Response, maxBytes: number): Promise<Uint8Array> {
+  const reader = res.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new WorkerError("invalid_response");
+      }
+      chunks.push(value);
+    }
+  } catch (e) {
+    if (e instanceof WorkerError) throw e;
+    throw new WorkerError(isAbortError(e) ? "timeout" : "unreachable");
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 async function readJson<T>(res: Response, schema: z.ZodType<T>): Promise<T> {
   if (!res.ok) throw await httpError(res);
   let body: unknown;
@@ -135,9 +165,7 @@ export function createWorkerClient(opts: { baseUrl: string; token: string; fetch
         await res.body?.cancel();
         throw new WorkerError("invalid_response");
       }
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.length > WORKER_OUTPUT_MAX_BYTES) throw new WorkerError("invalid_response");
-      return bytes;
+      return readLimited(res, WORKER_OUTPUT_MAX_BYTES);
     },
     async cancelJob(id) {
       return readJson(await send(jobPath(id), { method: "DELETE", timeout: WORKER_TIMEOUTS.create }), workerCancelSchema);
