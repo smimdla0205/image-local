@@ -19,6 +19,8 @@ import {
 
 export const WORKER_TIMEOUTS = { get: 5_000, create: 15_000, download: 60_000 } as const;
 const RETRY_DELAY_MS = 200;
+// 결과 PNG 상한(2048×2048 RGBA 무압축도 16MB 라 넉넉하다). 넘으면 워커 응답이 이상한 것으로 본다
+export const WORKER_OUTPUT_MAX_BYTES = 64 * 1024 * 1024;
 
 export type WorkerErrorKind = "unreachable" | "timeout" | "http" | "invalid_response";
 
@@ -126,7 +128,16 @@ export function createWorkerClient(opts: { baseUrl: string; token: string; fetch
     async getOutput(id) {
       const res = await send(`${jobPath(id)}/output`, { method: "GET", timeout: WORKER_TIMEOUTS.download });
       if (!res.ok) throw await httpError(res);
-      return new Uint8Array(await res.arrayBuffer());
+      // 프록시의 HTML·JSON 이나 지나치게 큰 본문을 이미지로 저장하지 않는다
+      const contentType = res.headers.get("content-type") ?? "";
+      const declared = Number(res.headers.get("content-length") ?? "0");
+      if (!contentType.startsWith("image/png") || declared > WORKER_OUTPUT_MAX_BYTES) {
+        await res.body?.cancel();
+        throw new WorkerError("invalid_response");
+      }
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length > WORKER_OUTPUT_MAX_BYTES) throw new WorkerError("invalid_response");
+      return bytes;
     },
     async cancelJob(id) {
       return readJson(await send(jobPath(id), { method: "DELETE", timeout: WORKER_TIMEOUTS.create }), workerCancelSchema);

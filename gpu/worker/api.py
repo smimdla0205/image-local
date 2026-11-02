@@ -37,7 +37,8 @@ def create_app(backend: Backend, token: str) -> FastAPI:
 
     @app.middleware("http")
     async def require_bearer(request: Request, call_next):
-        if request.url.path == "/health":
+        # 예외 경로는 ASGI scope 의 경로로만 판단한다(request.url 은 Host 헤더로 만들어져 오래된 Starlette 에서 조작될 수 있다)
+        if request.scope["path"] == "/health":
             return await call_next(request)
         header = request.headers.get("authorization", "")
         received = header[len("Bearer ") :] if header.startswith("Bearer ") else ""
