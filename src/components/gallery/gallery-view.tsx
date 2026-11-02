@@ -1,6 +1,7 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { cn } from "cn";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
@@ -10,6 +11,7 @@ import { groupByDate } from "@/components/shell/day-groups";
 import { Topbar } from "@/components/shell/topbar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { apiFetch } from "@/lib/api-client";
 import { isModelId } from "@/lib/gpu/models";
 import type { ImageListDto } from "@/lib/jobs/schemas";
@@ -45,6 +47,8 @@ export function GalleryView() {
     },
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    // 검색·필터를 바꾸면 새 결과가 올 때까지 이전 결과를 흐리게 남긴다(자리표시로 깜빡이지 않게)
+    placeholderData: keepPreviousData,
   });
 
   // 필터를 주소에 반영한다(뷰어가 열려 있으면 그대로 둔다)
@@ -65,12 +69,13 @@ export function GalleryView() {
   const filtered = q !== "" || model !== "";
 
   let content: React.ReactNode;
-  if (images.isPending) content = <GridSkeleton />;
+  // 이전 결과가 비어 있었으면 새 결과를 받는 동안 '없음' 대신 자리표시를 보인다(받기 전에 결과 없음을 보이지 않는다)
+  if (images.isPending || (images.isPlaceholderData && items.length === 0)) content = <GridSkeleton />;
   else if (images.isError) content = <p className="py-16 text-center text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
   else if (items.length === 0) content = <p className="py-16 text-center text-caption text-muted-foreground">{filtered ? "찾는 이미지가 없어요" : "아직 만든 이미지가 없어요"}</p>;
   else
     content = (
-      <>
+      <div aria-busy={images.isPlaceholderData} className={cn("flex flex-col gap-6 motion-safe:transition-opacity", images.isPlaceholderData && "opacity-60")}>
         {groupByDate(items, new Date(), (img) => img.createdAt).map((group) => (
           <section key={group.label} className="flex flex-col gap-2">
             <h2 className="text-label">{group.label}</h2>
@@ -78,11 +83,18 @@ export function GalleryView() {
           </section>
         ))}
         {images.hasNextPage && (
-          <Button type="button" variant="outline" className="mx-auto max-md:h-11" disabled={images.isFetchingNextPage} onClick={() => void images.fetchNextPage()}>
-            더 보기
+          <Button
+            type="button"
+            variant="outline"
+            className="mx-auto max-md:h-11"
+            disabled={images.isFetchingNextPage}
+            aria-busy={images.isFetchingNextPage}
+            onClick={() => void images.fetchNextPage()}
+          >
+            {images.isFetchingNextPage && <Spinner aria-label="불러오는 중" />}더 보기
           </Button>
         )}
-      </>
+      </div>
     );
 
   return (
