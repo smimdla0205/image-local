@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
+import { DANGER_TEXT, ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,7 +73,7 @@ export function ConversationMenu({ id, onDeletingChange }: Props) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={busy} onClick={handleDelete}>
+            <AlertDialogAction variant="outline" disabled={busy} onClick={handleDelete} className={DANGER_TEXT}>
               삭제
             </AlertDialogAction>
           </AlertDialogFooter>

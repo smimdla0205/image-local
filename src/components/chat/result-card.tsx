@@ -30,7 +30,7 @@ function TileActions({ image, model, onEdit }: { image: ImageDto; model: ModelId
           <PencilIcon aria-hidden="true" className="size-4" />
         </button>
       ) : (
-        <Link href={`/?image=${image.id}`} aria-label="다른 모델로 고치기" className={FLOAT_CLASS}>
+        <Link href={`/?edit=${image.id}`} aria-label="다른 모델로 고치기" className={FLOAT_CLASS}>
           <WandSparklesIcon aria-hidden="true" className="size-4" />
         </Link>
       )}
@@ -138,7 +138,7 @@ export function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: { jo
             프롬프트 복사
           </Button>
           {!getModel(model).canEdit && images[0] && (
-            <Link href={`/?image=${images[0].id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "max-md:h-11")}>
+            <Link href={`/?edit=${images[0].id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "max-md:h-11")}>
               다른 모델로 고치기
             </Link>
           )}

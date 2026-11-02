@@ -17,13 +17,13 @@ import { queryKeys } from "@/lib/query-keys";
 
 const ID_RE = /^[a-z0-9]+$/;
 
-// 새 대화: 모델을 고르고 첫 요청을 보내면 대화가 시작된다. ?image=<id> 는 '다른 모델로 고치기'로 넘어온 고칠 이미지
+// 새 대화: 모델을 고르고 첫 요청을 보내면 대화가 시작된다. ?edit=<id> 는 '다른 모델로 고치기'로 넘어온 고칠 이미지(?image= 는 전역 이미지 뷰어가 쓴다)
 export function NewChat() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const heroId = useId();
-  const raw = searchParams.get("image");
+  const raw = searchParams.get("edit");
   const linkedId = raw && ID_RE.test(raw) ? raw : null;
 
   const [model, setModel] = useState<ModelId>("klein");

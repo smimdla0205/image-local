@@ -12,8 +12,10 @@ export const CHIP_CLASS =
 export function RatioMenu({ value, onChange }: { value: Ratio; onChange: (r: Ratio) => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger aria-label="비율" className={CHIP_CLASS}>
+      {/* 접근 가능한 이름에 보이는 글자(비율 값)를 포함한다(WCAG 2.5.3) */}
+      <DropdownMenuTrigger className={CHIP_CLASS}>
         <RectangleHorizontalIcon aria-hidden="true" className="size-4" />
+        <span className="sr-only">비율 </span>
         <span className="tabular-nums">{value}</span>
         <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
