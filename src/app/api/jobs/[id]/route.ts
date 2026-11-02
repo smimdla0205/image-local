@@ -30,10 +30,12 @@ export const DELETE = handleRoute("jobs.cancel", async (_req, ctx) => {
   const job = await findJob(id);
   if (!isActive(job.status)) throw new ApiError(409, "job_finished");
 
-  if (!job.submittedAt) {
-    // 워커에 보낸 적 없는 잡은 워커를 부르지 않고 취소한다
-    await cancelInDb(id);
-  } else {
+  // 워커에 보낸 적 없는 잡은 워커를 부르지 않고 취소한다(그 사이 제출이 끝났으면 아래에서 워커에 취소를 보낸다)
+  const cancelledLocally =
+    !job.submittedAt && (await prisma.job.updateMany({ where: { id, status: { in: [...ACTIVE] }, submittedAt: null }, data: { status: "CANCELLED", queuePosition: null } })).count > 0;
+  if (!cancelledLocally) {
+    const current = await findJob(id);
+    if (!isActive(current.status)) throw new ApiError(409, "job_finished");
     try {
       const res = await getWorkerClient().cancelJob(id);
       // cancel_requested 는 워커가 멈춘 뒤 다음 동기화가 CANCELLED 로 바꾼다

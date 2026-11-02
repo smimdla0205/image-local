@@ -2,6 +2,7 @@
 // 단위 테스트가 별칭 없이 불러오므로 이 파일은 상대 경로 import 만 쓴다
 import type { z } from "zod";
 
+import { readStreamLimited } from "../streams";
 import {
   type WorkerCancel,
   workerCancelSchema,
@@ -75,34 +76,16 @@ async function httpError(res: Response): Promise<WorkerError> {
   return parsed.success ? new WorkerError("http", res.status, parsed.data.error.code, parsed.data.error.message) : new WorkerError("http", res.status);
 }
 
-// 본문을 조각마다 세며 읽어 상한을 넘는 순간 멈춘다. 읽는 도중 끊기거나 시간이 다 되면 워커 사용 불가 오류로 바꾼다
+// 본문을 상한까지만 읽는다. 넘으면 이상한 응답, 읽는 도중 끊기거나 시간이 다 되면 워커 사용 불가 오류로 바꾼다
 async function readLimited(res: Response, maxBytes: number): Promise<Uint8Array> {
-  const reader = res.body?.getReader();
-  if (!reader) return new Uint8Array();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+  let bytes: Uint8Array | null;
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        throw new WorkerError("invalid_response");
-      }
-      chunks.push(value);
-    }
+    bytes = await readStreamLimited(res.body, maxBytes);
   } catch (e) {
-    if (e instanceof WorkerError) throw e;
     throw new WorkerError(isAbortError(e) ? "timeout" : "unreachable");
   }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return out;
+  if (!bytes) throw new WorkerError("invalid_response");
+  return bytes;
 }
 
 async function readJson<T>(res: Response, schema: z.ZodType<T>): Promise<T> {

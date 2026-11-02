@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { makeThumb, normalizeImage, readImageSize } from "@/lib/images/normalize";
 import { toImageDto } from "@/lib/jobs/queries";
 import { deleteFile, putFile, storageKey } from "@/lib/storage";
+import { readStreamLimited } from "@/lib/streams";
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 // 멀티파트 경계·헤더 여유분. 선언된 크기가 이보다 크면 본문을 읽지 않고 거절한다
@@ -23,12 +24,16 @@ function isSupportedImage(b: Uint8Array): boolean {
 
 // POST /api/uploads — multipart 필드 file 의 사진을 정규화해 저장하고 ImageDto 를 돌려준다
 export const POST = handleRoute("uploads.create", async (req) => {
+  const maxBody = MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD;
   const declared = Number(req.headers.get("content-length") ?? "0");
-  if (declared > MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD) throw new ApiError(413, "file_too_large");
+  if (declared > maxBody) throw new ApiError(413, "file_too_large");
+  // Content-Length 가 없거나(청크) 틀려도 실제로 읽은 양으로 막는다. 멀티파트는 상한 안의 본문만 해석한다
+  const raw = await readStreamLimited(req.body, maxBody);
+  if (!raw) throw new ApiError(413, "file_too_large");
 
   let form: FormData;
   try {
-    form = await req.formData();
+    form = await new Response(raw, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
   } catch {
     // multipart 가 아니거나 본문이 깨졌다
     throw new ApiError(400, "file_required");

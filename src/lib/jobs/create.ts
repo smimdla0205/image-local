@@ -118,7 +118,12 @@ export async function submitToWorker(job: JobWithImages, inputIds: Map<string, s
       transparent: job.transparent,
       input_id: inputId,
     });
-    await prisma.job.updateMany({ where: { id: job.id, submittedAt: null }, data: { submittedAt: new Date() } });
+    // 아직 진행 중일 때만 제출 시각을 남긴다. 보내는 사이 사용자가 취소했다면 워커 쪽 잡도 취소한다(GPU 를 헛돌리지 않게)
+    const marked = await prisma.job.updateMany({ where: { id: job.id, submittedAt: null, status: { in: ["QUEUED", "RUNNING"] } }, data: { submittedAt: new Date() } });
+    if (marked.count === 0) {
+      const current = await prisma.job.findUnique({ where: { id: job.id }, select: { status: true } });
+      if (current?.status === "CANCELLED") await client.cancelJob(job.id).catch(() => undefined);
+    }
     return "submitted";
   } catch (e) {
     if (isWorkerUnavailable(e)) return "unavailable";
@@ -130,12 +135,21 @@ export async function submitToWorker(job: JobWithImages, inputIds: Map<string, s
   }
 }
 
-// 트랜잭션이 끝난 뒤 잡을 차례로 워커에 보낸다. 하나라도 워커를 못 쓰면 나머지는 다음 동기화에 맡긴다
+// 트랜잭션이 끝난 뒤 잡을 차례로 워커에 보낸다. 하나라도 워커를 못 쓰면 나머지는 다음 동기화에 맡긴다.
+// 대화·잡은 이미 만들어졌으므로 디스크·DB 같은 로컬 오류도 500 으로 끝내지 않고 남은 잡을 다음 동기화에 맡긴다
 export async function submitJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithImages[]; worker: WorkerState }> {
   let reachable = true;
   const inputIds = new Map<string, string>();
   for (const job of jobs) {
-    if ((await submitToWorker(job, inputIds)) === "unavailable") {
+    let result: "submitted" | "unavailable";
+    try {
+      result = await submitToWorker(job, inputIds);
+    } catch (e) {
+      // 잡 id 와 오류 종류만 남긴다(메시지에 프롬프트·경로가 섞일 수 있다)
+      console.error("[submit]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
+      break;
+    }
+    if (result === "unavailable") {
       reachable = false;
       break;
     }
