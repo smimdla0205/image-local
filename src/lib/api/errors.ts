@@ -1,4 +1,5 @@
 // API 오류 응답과 라우트 공통 처리. 단위 테스트가 별칭 없이 불러오므로 이 파일은 상대 경로 import 만 쓴다
+import { unstable_rethrow } from "next/navigation";
 import { type z, ZodError } from "zod";
 
 // 사용자에게 그대로 보이는 문구(해요체)
@@ -74,6 +75,8 @@ export function handleRoute(name: string, fn: RouteFn): RouteFn {
       if (MUTATING_METHODS.has(req.method) && site && !SAME_SITE_VALUES.has(site)) return jsonError(403, "forbidden");
       return await fn(req, ctx);
     } catch (err) {
+      // Next 의 내부 신호(빌드 때 미리 렌더링 중단, notFound 등)는 오류 응답으로 바꾸지 않고 Next 에 돌려준다
+      unstable_rethrow(err);
       if (err instanceof ApiError) return jsonError(err.status, err.code, err.message);
       // zod 의 영문 메시지는 싣지 않는다
       if (err instanceof ZodError) return jsonError(400, "invalid_request");
