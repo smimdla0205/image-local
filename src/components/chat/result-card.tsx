@@ -44,18 +44,19 @@ function TileActions({ image, model, onEdit }: { image: ImageDto; model: ModelId
 function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; onEdit: Handlers["onEdit"] }) {
   return (
     <figure className="group relative m-0 overflow-hidden rounded-md bg-muted">
-      {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG 라 next/image 최적화가 필요 없다 */}
-      <img
-        src={image.url}
-        alt={image.prompt ?? ""}
-        width={image.width}
-        height={image.height}
-        loading="lazy"
-        decoding="async"
-        className={cn("block h-auto w-full", image.hasAlpha && "checker")}
-      />
-      {/* 이미지 어디를 눌러도 크게 본다. 키보드·스크린리더는 위의 '크게 보기' 버튼을 쓴다 */}
-      <Link href={`?image=${image.id}`} scroll={false} tabIndex={-1} aria-hidden="true" className="absolute inset-0 cursor-zoom-in" />
+      {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
+      <Link href={`?image=${image.id}`} scroll={false} tabIndex={-1} className="block cursor-zoom-in">
+        {/* eslint-disable-next-line @next/next/no-img-element -- 앱이 서빙하는 원본 PNG 라 next/image 최적화가 필요 없다 */}
+        <img
+          src={image.url}
+          alt={image.prompt ?? ""}
+          width={image.width}
+          height={image.height}
+          loading="lazy"
+          decoding="async"
+          className={cn("block h-auto w-full", image.hasAlpha && "checker")}
+        />
+      </Link>
       <TileActions image={image} model={model} onEdit={onEdit} />
     </figure>
   );
@@ -116,10 +117,13 @@ export function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: { jo
       </div>
 
       {slider ? (
-        <div className="group relative">
-          <CompareSlider before={slider.before} after={slider.after} />
-          <TileActions image={slider.after} model={model} onEdit={onEdit} />
-        </div>
+        <>
+          <div className="group relative">
+            <CompareSlider before={slider.before} after={slider.after} />
+            <TileActions image={slider.after} model={model} onEdit={onEdit} />
+          </div>
+          <p className="text-caption text-muted-foreground">고치면 요청하지 않은 부분도 조금 바뀔 수 있어요. 마음에 들지 않으면 이전 버전에서 다시 고치세요.</p>
+        </>
       ) : (
         succeeded.length > 0 && (
           <div className={cn("grid gap-2", succeeded.length > 1 ? "grid-cols-2" : "max-w-md grid-cols-1")}>
