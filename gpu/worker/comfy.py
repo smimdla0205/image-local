@@ -54,10 +54,11 @@ def _describe_rejection(body: object) -> str:
 
 
 class ComfyClient:
-    def __init__(self, base_url: str, http: httpx.Client, idle_limit_s: float = 300.0) -> None:
+    def __init__(self, base_url: str, http: httpx.Client, idle_limit_s: float = 300.0, tick_s: float = 1.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.http = http
         self.idle_limit_s = idle_limit_s
+        self.tick_s = tick_s
 
     def alive(self) -> bool:
         """ComfyUI 서버가 응답하는지(GET /system_stats 가 200)."""
@@ -90,22 +91,27 @@ class ComfyClient:
         return ws_factory(self.ws_url(client_id))
 
     def iter_progress(self, prompt_id: str, ws: WsLike) -> Iterator[Progress | None]:
-        """이 프롬프트의 진행을 낸다. 메시지 없이 1초가 지나면 None(호출한 쪽이 취소를 확인할 틈).
+        """이 프롬프트의 진행을 낸다. 적어도 tick_s 마다 None 을 내 호출한 쪽에 취소를 확인할 틈을 준다
+        (메시지가 없을 때도, 글자 미리보기처럼 다른 메시지가 쉬지 않고 올 때도).
 
         끝은 executing(node=None) 이다. execution_success 는 결과 기록(history) 전에 오므로 끝으로 보지 않는다.
         """
-        ws.settimeout(1.0)
-        last = time.monotonic()
+        ws.settimeout(self.tick_s)
+        last = last_yield = time.monotonic()
         while True:
             try:
                 raw = ws.recv()
             except websocket.WebSocketTimeoutException:
                 if time.monotonic() - last >= self.idle_limit_s:
                     raise ComfyError(f"ComfyUI 진행 메시지가 {self.idle_limit_s:.0f}초 동안 없어요") from None
+                last_yield = time.monotonic()
                 yield None
                 continue
             last = time.monotonic()
-            if isinstance(raw, bytes):  # 미리보기 이미지
+            if last - last_yield >= self.tick_s:
+                last_yield = last
+                yield None
+            if isinstance(raw, bytes):  # 미리보기 이미지·글자
                 continue
             message = json.loads(raw)
             data = message.get("data") or {}
@@ -113,6 +119,7 @@ class ComfyClient:
                 continue
             kind = message.get("type")
             if kind == "progress":
+                last_yield = time.monotonic()
                 yield Progress(int(data["value"]), int(data["max"]))
             elif kind == "executing" and data.get("node") is None:
                 return

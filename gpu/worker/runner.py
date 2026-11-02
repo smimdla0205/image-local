@@ -60,9 +60,13 @@ def run_job(
         client_id = uuid.uuid4().hex
         ws = client.connect_ws(client_id, ws_factory)  # 끝 메시지를 놓치지 않게 큐에 넣기 전에 연결한다
         prompt_id = client.queue_prompt(workflow, client_id)
+        interrupting = False
         for progress in client.iter_progress(prompt_id, ws):
             # ComfyUI 는 실행을 시작할 때 인터럽트 표시를 지우므로 취소가 걸려 있는 동안 매번 보낸다
             if cancel_requested():
+                if not interrupting:
+                    print(f"[runner] job {job.id} 중지 요청: 인터럽트를 보낸다", file=sys.stderr)
+                    interrupting = True
                 client.interrupt(prompt_id)
             # 프롬프트 보강 같은 다른 노드의 진행(max 가 step 수와 다름)은 step 으로 쓰지 않는다
             if isinstance(progress, Progress) and progress.total == job.steps:
@@ -74,6 +78,12 @@ def run_job(
         data = client.fetch_output(found["filename"], found.get("subfolder", ""), found["type"])
         img = Image.open(BytesIO(data))
         img.load()
+        if not job.transparent and img.mode in ("RGBA", "LA", "PA"):
+            # Qwen 2.1 VAE 는 투명을 요청하지 않아도 RGBA(일부 반투명)를 낸다. 투명 배경을 고르지 않았으면 RGB 로 남긴다
+            img = img.convert("RGB")
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            data = buf.getvalue()
         output = OutputInfo(width=img.width, height=img.height, has_alpha=_has_alpha(img))
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"{job.id}.png").write_bytes(data)
@@ -81,6 +91,7 @@ def run_job(
         store.transition(job.id, ("running",), status="succeeded", step=job.steps, output=output.model_dump())
         return output
     except ComfyInterrupted:
+        print(f"[runner] job {job.id} 중지됨", file=sys.stderr)
         store.transition(job.id, ("running",), status="cancelled")
         return None
     except ComfyError as e:
