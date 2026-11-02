@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components/chat/composer";
 import { ModelPicker } from "@/components/chat/model-picker";
+import { toTarget } from "@/components/chat/target-chip";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
@@ -15,10 +16,6 @@ import type { ConversationDetailDto, ImageDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
 const ID_RE = /^[a-z0-9]+$/;
-
-export function toTarget(img: ImageDto): ComposerTarget {
-  return { imageId: img.id, thumbUrl: img.thumbUrl, width: img.width, height: img.height, label: img.kind === "UPLOADED" ? "올린 사진" : `버전 ${img.version}` };
-}
 
 // 새 대화: 모델을 고르고 첫 요청을 보내면 대화가 시작된다. ?image=<id> 는 '다른 모델로 고치기'로 넘어온 고칠 이미지
 export function NewChat() {
@@ -62,7 +59,7 @@ export function NewChat() {
   return (
     <>
       <Topbar title="새 대화" hideTitle />
-      <section aria-labelledby={heroId} className="mx-auto flex w-full max-w-[820px] flex-1 flex-col justify-center gap-6 px-4 pt-10 pb-16 sm:px-6">
+      <section aria-labelledby={heroId} className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-10 pb-16 sm:px-6">
         <h2 id={heroId} className="text-center text-display">
           무엇을 만들까요?
         </h2>
@@ -88,7 +85,7 @@ export function NewChat() {
 
 export function NewChatSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-[820px] flex-1 flex-col justify-center gap-6 px-4 pt-24 pb-16 sm:px-6" aria-hidden="true">
+    <div className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-24 pb-16 sm:px-6" aria-hidden="true">
       <Skeleton className="mx-auto h-9 w-56" />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Skeleton className="h-28" />
