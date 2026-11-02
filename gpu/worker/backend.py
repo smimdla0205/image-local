@@ -138,7 +138,8 @@ def render_mock_png(model: str, width: int, height: int, transparent: bool) -> b
 class MockBackend:
     """GPU 없이 계약대로 움직이는 백엔드. 잡은 한 스레드가 FIFO 로 처리하고 step 마다 step_interval 초 쉰다.
 
-    프롬프트 접두어로 실패를 흉내 낸다: "[fail]" 은 마지막 step 뒤 failed, "[lost]" 는 레코드를 지운다(이후 404).
+    프롬프트 접두어로 실패를 흉내 낸다: "[fail]" 은 마지막 step 뒤 failed, "[lost]" 는 레코드를 지운다(이후 404),
+    "[slow-output]" 은 끝난 뒤 결과를 두 번 '아직 없음'으로 낸다(Modal Volume 반영이 늦는 경우).
     """
 
     name = "mock"
@@ -148,6 +149,7 @@ class MockBackend:
         self.step_interval = step_interval
         self._inputs: set[str] = set()
         self._outputs: dict[str, bytes] = {}
+        self._output_misses: dict[str, int] = {}
         self._queue: queue.Queue[str | None] = queue.Queue()
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -197,6 +199,9 @@ class MockBackend:
         record = self.store.get(job_id)
         if record is None or record["status"] != "succeeded":
             return None
+        if self._output_misses.get(job_id, 0) > 0:
+            self._output_misses[job_id] -= 1
+            return None
         return self._outputs.get(job_id)
 
     def cancel(self, job_id: str) -> CancelResponse:
@@ -237,6 +242,8 @@ class MockBackend:
         if prompt.startswith("[lost]"):
             self.store.delete(job_id)
             return
+        if prompt.startswith("[slow-output]"):
+            self._output_misses[job_id] = 2
         self._outputs[job_id] = render_mock_png(record["model"], record["width"], record["height"], record["transparent"])
         output = OutputInfo(width=record["width"], height=record["height"], has_alpha=record["transparent"])
         self.store.transition(job_id, ("running",), status="succeeded", step=total, output=output.model_dump())

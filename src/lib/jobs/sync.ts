@@ -128,6 +128,8 @@ export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithIm
         reachable = false;
         break;
       }
+      // 워커는 끝났다는데 결과가 아직 안 보이면(409 not_ready, Modal Volume 반영 지연) 잡을 그대로 두고 다음 폴링에 다시 받는다
+      if (e instanceof WorkerError && e.kind === "http" && e.status === 409) continue;
       touched.add(job.id);
       if (e instanceof WorkerError && e.kind === "http" && e.status === 404) {
         await patchIfActive(job.id, { status: "FAILED", error: WORKER_LOST_MESSAGE });
