@@ -65,16 +65,11 @@ export function ComposerOptions({ count, onCountChange, transparent, onTranspare
           </p>
         </fieldset>
         {transparent !== null && (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-3">
-              <span id={transparentId} className="text-label">
-                투명 배경
-              </span>
-              <Switch aria-labelledby={transparentId} aria-describedby={`${transparentId}-hint`} checked={transparent} onCheckedChange={(v) => onTransparentChange(v)} />
-            </div>
-            <p id={`${transparentId}-hint`} className="text-caption text-muted-foreground">
-              배경 없이 RGBA 이미지로 만들어요.
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <span id={transparentId} className="text-label">
+              투명 배경
+            </span>
+            <Switch aria-labelledby={transparentId} checked={transparent} onCheckedChange={(v) => onTransparentChange(v)} />
           </div>
         )}
         <div className="flex flex-col gap-1.5">

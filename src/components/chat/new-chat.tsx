@@ -68,17 +68,7 @@ export function NewChat() {
           <ModelPicker value={selected} onChange={setModel} disabledIds={target ? NON_EDIT_IDS : []} />
           <p className="text-caption text-muted-foreground">모델은 대화를 시작할 때 정해요. 대화 안에서는 바뀌지 않아요.</p>
         </div>
-        <Composer
-          model={selected}
-          mode="new"
-          target={target}
-          onTargetChange={handleTargetChange}
-          onSubmit={handleSubmit}
-          note="첫 요청을 보내면 고른 모델로 대화가 시작되고, 그 뒤로는 모델이 바뀌지 않아요."
-        />
-        <p className="text-center text-caption text-muted-foreground">
-          <kbd className="font-sans">Enter</kbd> 생성 · <kbd className="font-sans">Shift</kbd> + <kbd className="font-sans">Enter</kbd> 줄바꿈
-        </p>
+        <Composer model={selected} mode="new" target={target} onTargetChange={handleTargetChange} onSubmit={handleSubmit} />
       </section>
     </>
   );

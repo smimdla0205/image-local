@@ -114,13 +114,10 @@ export function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: { jo
       </div>
 
       {slider ? (
-        <>
-          <div className="group relative">
-            <CompareSlider before={slider.before} after={slider.after} />
-            <TileActions image={slider.after} model={model} onEdit={onEdit} />
-          </div>
-          <p className="text-caption text-muted-foreground">고치면 요청하지 않은 부분도 조금 바뀔 수 있어요. 마음에 들지 않으면 이전 버전에서 다시 고치세요.</p>
-        </>
+        <div className="group relative">
+          <CompareSlider before={slider.before} after={slider.after} />
+          <TileActions image={slider.after} model={model} onEdit={onEdit} />
+        </div>
       ) : (
         succeeded.length > 0 && (
           <div className={cn("grid gap-2", succeeded.length > 1 ? "grid-cols-2" : "max-w-md grid-cols-1")}>

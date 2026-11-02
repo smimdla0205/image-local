@@ -30,12 +30,6 @@ function findImage(detail: ConversationDetailDto, id: string): ImageDto | null {
   return null;
 }
 
-function noteFor(model: ModelId, hasTarget: boolean): string {
-  if (!getModel(model).canEdit) return "MOSS-Image 대화는 만들기만 해요. 고치려면 새 대화에서 다른 모델을 고르세요.";
-  if (hasTarget) return "고칠 이미지를 붙였어요. 보내면 새 버전으로 고쳐요.";
-  return "이 대화의 모델은 바뀌지 않아요. 다른 모델은 새 대화에서 고르세요.";
-}
-
 export function ConversationView({ id, initialData }: { id: string; initialData: ConversationDetailDto }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -150,7 +144,15 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
         <div ref={endRef} />
       </div>
       <div className="sticky bottom-0 mx-auto w-full max-w-205 bg-background px-4 pb-4 sm:px-6 sm:pb-6">
-        <Composer model={model} mode="chat" target={target} onTargetChange={handleTargetChange} onSubmit={handleSubmit} note={noteFor(model, target !== null)} />
+        {/* 모델 고정은 상단 자물쇠가, 고칠 이미지는 칩이 알려 준다. 고치기를 못 하는 이유만 여기서 알린다 */}
+        <Composer
+          model={model}
+          mode="chat"
+          target={target}
+          onTargetChange={handleTargetChange}
+          onSubmit={handleSubmit}
+          note={spec.canEdit ? undefined : "MOSS-Image 대화는 만들기만 해요. 고치려면 새 대화에서 다른 모델을 고르세요."}
+        />
       </div>
     </>
   );
