@@ -1,0 +1,78 @@
+import { randomUUID } from "node:crypto";
+
+import { ApiError, handleRoute } from "@/lib/api/errors";
+import { prisma } from "@/lib/db";
+import { makeThumb, normalizeImage, readImageSize } from "@/lib/images/normalize";
+import { toImageDto } from "@/lib/jobs/queries";
+import { deleteFile, putFile, storageKey } from "@/lib/storage";
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+// 멀티파트 경계·헤더 여유분. 선언된 크기가 이보다 크면 본문을 읽지 않고 거절한다
+const MULTIPART_OVERHEAD = 1024 * 1024;
+// 가로세로 비율 상한(긴 변 / 짧은 변)
+const MAX_ASPECT = 4;
+
+// 파일 이름·Content-Type 이 아니라 앞부분 바이트로 형식을 가린다
+function isSupportedImage(b: Uint8Array): boolean {
+  const png = b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+  const jpeg = b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  const ascii = (from: number, to: number) => String.fromCharCode(...b.subarray(from, to));
+  const webp = b.length >= 12 && ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP";
+  return png || jpeg || webp;
+}
+
+// POST /api/uploads — multipart 필드 file 의 사진을 정규화해 저장하고 ImageDto 를 돌려준다
+export const POST = handleRoute("uploads.create", async (req) => {
+  const declared = Number(req.headers.get("content-length") ?? "0");
+  if (declared > MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD) throw new ApiError(413, "file_too_large");
+
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    // multipart 가 아니거나 본문이 깨졌다
+    throw new ApiError(400, "file_required");
+  }
+  const file = form.get("file");
+  if (!(file instanceof File)) throw new ApiError(400, "file_required");
+  if (file.size > MAX_UPLOAD_BYTES) throw new ApiError(413, "file_too_large");
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!isSupportedImage(bytes)) throw new ApiError(415, "unsupported_media_type");
+
+  let size: { width: number; height: number };
+  try {
+    size = await readImageSize(bytes);
+  } catch {
+    throw new ApiError(400, "invalid_image");
+  }
+  if (Math.max(size.width, size.height) / Math.min(size.width, size.height) > MAX_ASPECT) {
+    throw new ApiError(400, "invalid_image", "가로세로 비율이 너무 커요.");
+  }
+
+  let normalized: Awaited<ReturnType<typeof normalizeImage>>;
+  let thumb: Uint8Array;
+  try {
+    normalized = await normalizeImage(bytes);
+    thumb = await makeThumb(normalized.png);
+  } catch {
+    // 머리말은 읽혔지만 픽셀 데이터가 깨진 경우
+    throw new ApiError(400, "invalid_image");
+  }
+
+  const id = randomUUID().replaceAll("-", "");
+  const imageKey = storageKey("images", id);
+  const thumbKey = storageKey("thumbs", id);
+  await putFile(imageKey, normalized.png);
+  try {
+    await putFile(thumbKey, thumb);
+    const image = await prisma.image.create({
+      data: { id, kind: "UPLOADED", width: normalized.width, height: normalized.height, hasAlpha: normalized.hasAlpha, bytes: normalized.png.length },
+    });
+    return Response.json(toImageDto(image), { status: 201 });
+  } catch (e) {
+    // 행을 못 만들었으면 파일도 남기지 않는다
+    await Promise.all([deleteFile(imageKey), deleteFile(thumbKey)]);
+    throw e;
+  }
+});
