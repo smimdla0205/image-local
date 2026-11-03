@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ImagesIcon, SquarePenIcon } from "lucide-react";
+import { ImagesIcon, SquarePenIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
@@ -113,6 +113,17 @@ function SidebarNav() {
             >
               <ImagesIcon aria-hidden="true" />
               갤러리
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/trash"}
+              aria-current={pathname === "/trash" ? "page" : undefined}
+              render={<Link href="/trash" onClick={close} />}
+              className="max-md:h-11"
+            >
+              <Trash2Icon aria-hidden="true" />
+              휴지통
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
