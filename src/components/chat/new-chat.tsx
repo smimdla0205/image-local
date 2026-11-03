@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,10 +9,10 @@ import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components
 import { ModelPicker } from "@/components/chat/model-picker";
 import { TargetChipNotice, TargetChipSkeleton, toTarget } from "@/components/chat/target-chip";
 import { Topbar } from "@/components/shell/topbar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId, MODELS } from "@/lib/gpu/models";
 import { parseId } from "@/lib/jobs/constants";
+import { useLocationSearch } from "@/lib/location-search";
 import type { ConversationDetailDto, ImageDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -20,13 +20,13 @@ import { queryKeys } from "@/lib/query-keys";
 const NON_EDIT_IDS = MODELS.filter((m) => !m.canEdit).map((m) => m.id);
 const EDIT_FALLBACK_ID = MODELS.filter((m) => m.canEdit)[0].id;
 
-// 새 대화: 모델을 고르고 첫 요청을 보내면 대화가 시작된다. ?edit=<id> 는 '다른 모델로 고치기'로 넘어온 고칠 이미지(?image= 는 전역 이미지 뷰어가 쓴다)
+// 새 대화: 모델을 고르고 첫 요청을 보내면 대화가 시작된다. ?edit=<id> 는 '다른 모델로 고치기'로 넘어온 고칠 이미지(?image= 는 전역 이미지 뷰어가 쓴다).
+// 주소는 useSearchParams 대신 브라우저 location 으로 읽어(서버에서는 빈 값) 제목·모델·입력창이 정적 셸에 들어간다
 export function NewChat() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
   const heroId = useId();
-  const linkedId = parseId(searchParams.get("edit"));
+  const linkedId = parseId(new URLSearchParams(useLocationSearch()).get("edit"));
 
   const [model, setModel] = useState<ModelId>(MODELS[0].id);
   const [manualTarget, setManualTarget] = useState<ComposerTarget | null>(null);
@@ -83,20 +83,5 @@ export function NewChat() {
         <Composer model={selected} mode="new" target={target} onTargetChange={handleTargetChange} onSubmit={handleSubmit} targetSlot={linkedSlot} />
       </section>
     </>
-  );
-}
-
-export function NewChatSkeleton() {
-  return (
-    <div className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-24 pb-16 sm:px-6" aria-busy="true">
-      <span className="sr-only">불러오는 중…</span>
-      <Skeleton aria-hidden="true" className="mx-auto h-9 w-56" />
-      <div aria-hidden="true" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-      </div>
-      <Skeleton aria-hidden="true" className="h-32" />
-    </div>
   );
 }

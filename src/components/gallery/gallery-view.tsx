@@ -4,8 +4,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { cn } from "cn";
 import { ImagesIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useState } from "react";
 
 import { type GalleryFilter, GalleryFilters } from "@/components/gallery/gallery-filters";
 import { GalleryGrid } from "@/components/gallery/gallery-grid";
@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api-client";
 import { isModelId } from "@/lib/gpu/models";
 import type { ImageDto, ImageListDto } from "@/lib/jobs/schemas";
+import { replaceSearch, useLocationSearch } from "@/lib/location-search";
 import { queryKeys } from "@/lib/query-keys";
 
 // 격자 자리. announce: 한 번 낭독할지(더 보기 때는 버튼이 '불러오는 중…' 을 말하므로 끈다)
@@ -33,14 +34,45 @@ function GridSkeleton({ announce = true }: { announce?: boolean }) {
   );
 }
 
-// 갤러리: 만든·고친 이미지(최신순). 검색·모델 필터는 주소(?q·?model)에 둔다
+// 주소의 검색·모델 필터(없거나 모르는 값이면 빈 값)
+function readFilter(params: { get(name: string): string | null }): GalleryFilter {
+  const rawModel = params.get("model");
+  return { q: (params.get("q") ?? "").slice(0, 200), model: isModelId(rawModel) ? rawModel : "" };
+}
+
+// 갤러리: 만든·고친 이미지(최신순). 검색·모델 필터는 주소(?q·?model)에 둔다.
+// 필터는 주소를 브라우저 location 으로 읽어(서버에서는 빈 값) 정적 셸에 들어가고, 목록만 Suspense 안에서 useSearchParams 를 쓴다
 export function GalleryView() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const q = (searchParams.get("q") ?? "").slice(0, 200);
-  const rawModel = searchParams.get("model");
-  const model = isModelId(rawModel) ? rawModel : "";
+  const filter = readFilter(new URLSearchParams(useLocationSearch()));
+  const [imageToDelete, setImageToDelete] = useState<ImageDto | null>(null);
+
+  // 필터를 주소에 반영한다(뷰어의 ?image= 같은 다른 값은 그대로 둔다)
+  const handleFilterChange = useCallback((next: GalleryFilter) => {
+    const params = new URLSearchParams(window.location.search);
+    if (next.q) params.set("q", next.q);
+    else params.delete("q");
+    if (next.model) params.set("model", next.model);
+    else params.delete("model");
+    replaceSearch(params.toString());
+  }, []);
+
+  return (
+    <>
+      <Topbar title="갤러리" />
+      <ImageDeleteDialog image={imageToDelete} onOpenChange={(open) => !open && setImageToDelete(null)} />
+      <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6">
+        <GalleryFilters q={filter.q} model={filter.model} onChange={handleFilterChange} />
+        <Suspense fallback={<GridSkeleton />}>
+          <GalleryList onDelete={setImageToDelete} />
+        </Suspense>
+      </div>
+    </>
+  );
+}
+
+// 목록(날짜 묶음 격자·더 보기·빈 상태). 주소의 필터로 받는다
+function GalleryList({ onDelete }: { onDelete: (img: ImageDto) => void }) {
+  const { q, model } = readFilter(useSearchParams());
 
   const images = useInfiniteQuery({
     queryKey: queryKeys.images.list({ q: q || undefined, model: model || undefined }),
@@ -62,30 +94,14 @@ export function GalleryView() {
     placeholderData: (previous) => (previous?.pages.some((p) => p.items.length > 0) ? previous : undefined),
   });
 
-  // 필터를 주소에 반영한다(뷰어가 열려 있으면 그대로 둔다)
-  const handleFilterChange = useCallback(
-    (next: GalleryFilter) => {
-      const params = new URLSearchParams(searchParams);
-      if (next.q) params.set("q", next.q);
-      else params.delete("q");
-      if (next.model) params.set("model", next.model);
-      else params.delete("model");
-      const query = params.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    },
-    [router, pathname, searchParams],
-  );
-
   const items = images.data?.pages.flatMap((p) => p.items) ?? [];
   const filtered = q !== "" || model !== "";
-  const [imageToDelete, setImageToDelete] = useState<ImageDto | null>(null);
 
-  let content: React.ReactNode;
-  if (images.isPending) content = <GridSkeleton />;
+  if (images.isPending) return <GridSkeleton />;
   // 받은 목록이 있으면(다음 페이지만 실패) 격자를 남기고 '더 보기' 옆에서 알린다
-  else if (images.isError && !images.data) content = <LoadError align="center" message="목록을 불러오지 못했어요" onRetry={() => void images.refetch()} />;
-  else if (items.length === 0)
-    content = (
+  if (images.isError && !images.data) return <LoadError align="center" message="목록을 불러오지 못했어요" onRetry={() => void images.refetch()} />;
+  if (items.length === 0)
+    return (
       <Empty className="border py-10">
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -96,7 +112,7 @@ export function GalleryView() {
         </EmptyHeader>
         <EmptyContent>
           {filtered ? (
-            <Button type="button" variant="outline" onClick={() => router.replace(pathname, { scroll: false })} className="max-md:h-11">
+            <Button type="button" variant="outline" onClick={() => replaceSearch("")} className="max-md:h-11">
               필터 지우기
             </Button>
           ) : (
@@ -107,9 +123,8 @@ export function GalleryView() {
         </EmptyContent>
       </Empty>
     );
-  else
-    content = (
-      <div aria-busy={images.isPlaceholderData} className={cn("flex flex-col gap-6 motion-safe:transition-opacity", images.isPlaceholderData && "opacity-60")}>
+  return (
+    <div aria-busy={images.isPlaceholderData} className={cn("flex flex-col gap-6 motion-safe:transition-opacity", images.isPlaceholderData && "opacity-60")}>
         {groupByDate(items, new Date(), (img) => img.createdAt).map((group, i, groups) => (
           <section key={group.label} className="flex flex-col gap-2">
             <h2 className="text-label">{group.label}</h2>
@@ -117,7 +132,7 @@ export function GalleryView() {
               images={group.items}
               label={`${group.label} 이미지`}
               startIndex={groups.slice(0, i).reduce((n, g) => n + g.items.length, 0)}
-              onDelete={setImageToDelete}
+              onDelete={onDelete}
             />
           </section>
         ))}
@@ -132,24 +147,4 @@ export function GalleryView() {
         )}
       </div>
     );
-
-  return (
-    <>
-      <Topbar title="갤러리" />
-      <ImageDeleteDialog image={imageToDelete} onOpenChange={(open) => !open && setImageToDelete(null)} />
-      <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6">
-        <GalleryFilters q={q} model={model} onChange={handleFilterChange} />
-        {content}
-      </div>
-    </>
-  );
-}
-
-export function GallerySkeleton() {
-  return (
-    <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-16 pb-8 sm:px-6">
-      <Skeleton aria-hidden="true" className="h-9 w-80 max-w-full" />
-      <GridSkeleton />
-    </div>
-  );
 }

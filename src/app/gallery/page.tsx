@@ -1,12 +1,6 @@
-import { Suspense } from "react";
+import { GalleryView } from "@/components/gallery/gallery-view";
 
-import { GallerySkeleton, GalleryView } from "@/components/gallery/gallery-view";
-
-// 갤러리. 검색·필터를 주소에서 읽으므로(useSearchParams) Suspense 안에 둔다
+// 갤러리. 검색·필터는 정적 셸에 들어가고, 주소를 읽는 목록만 GalleryView 안의 Suspense 에 있다
 export default function GalleryPage() {
-  return (
-    <Suspense fallback={<GallerySkeleton />}>
-      <GalleryView />
-    </Suspense>
-  );
+  return <GalleryView />;
 }
