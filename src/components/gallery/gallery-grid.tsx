@@ -34,7 +34,7 @@ const GalleryTile = memo(function GalleryTile({ img, order, onDelete }: { img: I
       </ViewerLink>
       <div className="hover-actions pointer-events-none absolute bottom-2 left-2 flex gap-1">
         {spec && <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{spec.shortName}</span>}
-        <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{img.kind === "EDITED" ? "고침" : "생성"}</span>
+        <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{img.kind === "EDITED" ? "이어서 고치기" : "텍스트→이미지"}</span>
       </div>
       <div className="hover-actions absolute top-2 right-2 flex gap-1">
         <ViewerLink imageId={img.id} aria-label="크게 보기" className={FLOAT_CLASS}>

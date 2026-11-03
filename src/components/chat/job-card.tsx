@@ -29,14 +29,14 @@ export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel
   let action: { label: string; run: () => void } | null = null;
   switch (job.status) {
     case "QUEUED":
-      title = "대기 중";
+      title = "대기 중…";
       detail = job.queuePosition && job.queuePosition > 0 ? `앞에 ${job.queuePosition}건` : "곧 시작해요";
       action = { label: "취소", run: onCancel };
       break;
     case "RUNNING":
-      title = job.kind === "EDIT" ? "고치는 중" : "생성 중";
+      title = job.kind === "EDIT" ? "고치는 중…" : "생성 중…";
       // 마지막 step 뒤에는 결과를 받아 저장하는 중이다
-      detail = job.step >= job.steps ? "마무리하는 중" : steps;
+      detail = job.step >= job.steps ? "마무리하는 중…" : steps;
       action = { label: "중지", run: onCancel };
       break;
     case "FAILED":
@@ -44,8 +44,9 @@ export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel
       action = onRegenerate && { label: "다시 생성", run: onRegenerate };
       break;
     default:
-      title = "중지했어요";
-      detail = steps;
+      // 시작 전에 취소한 잡(0 step)과 돌다가 중지한 잡을 구분한다
+      title = job.step > 0 ? "중지했어요" : "취소했어요";
+      detail = job.step > 0 ? steps : null;
       action = onRegenerate && { label: "다시 생성", run: onRegenerate };
   }
   // 대기 0건·0 step 이 오래가면 위 문구 대신 GPU 를 깨우는 중이라고 알린다(starting 은 그 두 경우에만 참)

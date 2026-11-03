@@ -92,7 +92,7 @@ export function ImageViewerDialog() {
       <ImageDeleteDialog image={deleting} onOpenChange={(open) => !open && setDeleting(null)} onDeleted={handleDeleted} />
       <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto p-0 sm:max-w-5xl">
         <div className="flex items-center gap-2 border-b px-4 py-2">
-          <DialogTitle className="min-w-0 flex-1 truncate text-label">이미지 자세히 보기</DialogTitle>
+          <DialogTitle className="min-w-0 flex-1 truncate text-label">크게 보기</DialogTitle>
           <DialogClose aria-label="닫기" className={ICON_BUTTON_CLASS}>
             <XIcon aria-hidden="true" className="size-4" />
           </DialogClose>

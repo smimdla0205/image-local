@@ -141,7 +141,7 @@ export function TrashView() {
         }
       />
       <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6">
-        <p className="text-caption text-muted-foreground">30일이 지나면 자동으로 지워져요</p>
+        <p className="text-caption text-muted-foreground">30일이 지나면 자동으로 삭제돼요</p>
         {content}
       </div>
       <AlertDialog open={emptyOpen} onOpenChange={(open) => !busy && setEmptyOpen(open)}>
@@ -149,7 +149,7 @@ export function TrashView() {
           <AlertDialogHeader>
             <AlertDialogTitle>휴지통을 비울까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              대화 <span className="tabular-nums">{counts.conversations}</span>개와 이미지 <span className="tabular-nums">{counts.images}</span>장이 영구히 지워져요
+              대화 <span className="tabular-nums">{counts.conversations}</span>개와 이미지 <span className="tabular-nums">{counts.images}</span>장이 영구히 삭제돼요
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

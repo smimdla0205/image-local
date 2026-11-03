@@ -108,9 +108,9 @@ export const ResultCard = memo(function ResultCard({ jobs, model, priority = fal
   const label = active.length
     ? active.some((j) => j.status === "RUNNING")
       ? isEdit
-        ? "고치는 중"
-        : "생성 중"
-      : "대기 중"
+        ? "고치는 중…"
+        : "생성 중…"
+      : "대기 중…"
     : isEdit
       ? `고친 결과${version ? `, 버전 ${version}` : ""}`
       : images.length === 0 && succeeded.length > 0
@@ -122,7 +122,7 @@ export const ResultCard = memo(function ResultCard({ jobs, model, priority = fal
       await navigator.clipboard.writeText(first.prompt);
       toast.success("프롬프트를 복사했어요");
     } catch {
-      toast.error("프롬프트를 복사하지 못했어요");
+      toast.error("복사하지 못했어요");
     }
   }
 

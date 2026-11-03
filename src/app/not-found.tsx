@@ -19,14 +19,14 @@ export default function NotFound() {
           <EmptyMedia variant="icon">
             <SearchX />
           </EmptyMedia>
-          <EmptyTitle>페이지를 찾을 수 없습니다</EmptyTitle>
+          <EmptyTitle>페이지를 찾을 수 없어요</EmptyTitle>
           <EmptyDescription>
-            주소가 잘못됐거나 삭제된 대화일 수 있습니다.
+            주소가 잘못됐거나 삭제된 대화일 수 있어요
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button nativeButton={false} render={<Link href="/" />}>
-            새 채팅으로
+            새 대화로
           </Button>
         </EmptyContent>
       </Empty>
