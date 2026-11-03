@@ -15,6 +15,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarResizeHandle,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -158,6 +159,7 @@ export function AppSidebar() {
           <SidebarNav />
         </Suspense>
       </SidebarContent>
+      <SidebarResizeHandle />
     </Sidebar>
   );
 }

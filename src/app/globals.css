@@ -203,6 +203,16 @@ html[data-sidebar="collapsed"] [data-slot="sidebar-container"][data-side="left"]
   left: calc(var(--sidebar-width) * -1);
 }
 
+/* 너비를 끄는 동안: 폭 전환을 끄고 글자가 선택되지 않게 한다 */
+[data-slot="sidebar-wrapper"][data-resizing] {
+  cursor: col-resize;
+  user-select: none;
+}
+[data-slot="sidebar-wrapper"][data-resizing] [data-slot="sidebar-gap"],
+[data-slot="sidebar-wrapper"][data-resizing] [data-slot="sidebar-container"] {
+  transition: none;
+}
+
 /* 이미지를 받는 동안: 이미지는 투명하고 자리(.image-frame, muted)는 은은하게 깜빡인다. 다 받으면 짧게 나타난다(FadeImage).
    깜빡임은 틀 위 의사 요소의 opacity 로 해 합성 단계에서 돈다(화면 밖 지연 로딩 틀이 많아도 가볍다).
    한 틀의 이미지는 모두 받은 뒤 함께 보인다(비교 슬라이더처럼 겹친 두 장). 움직임 줄이기면 바로 바꾼다 */

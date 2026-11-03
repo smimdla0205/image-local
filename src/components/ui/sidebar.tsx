@@ -25,12 +25,23 @@ import {
 } from "@/components/ui/tooltip"
 import { PanelLeftIcon } from "lucide-react"
 
+import {
+  clampSidebarWidth,
+  readSidebarWidthCookie,
+  SIDEBAR_WIDTH_COOKIE,
+  SIDEBAR_WIDTH_DEFAULT,
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_WIDTH_MIN,
+  SIDEBAR_WIDTH_STEP,
+} from "@/lib/sidebar-width"
+
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH = `${SIDEBAR_WIDTH_DEFAULT}rem`
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const REM_PX = 16
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -40,6 +51,11 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  // 너비(rem). 드래그·방향키로 바꾸고 쿠키로 유지한다
+  width: number
+  setWidth: (width: number, persist?: boolean) => void
+  resizing: boolean
+  setResizing: (resizing: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -99,6 +115,22 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
+  // 너비. 첫 페인트는 인라인 스크립트가 쿠키로 html 의 --sidebar-width-user 에 올린다. 상태는 aria 값과 저장에 쓴다
+  const restoredWidth = React.useSyncExternalStore(
+    subscribeNoop,
+    () => readSidebarWidthCookie(document.cookie),
+    () => SIDEBAR_WIDTH_DEFAULT
+  )
+  const [userWidth, setUserWidth] = React.useState<number | null>(null)
+  const [resizing, setResizing] = React.useState(false)
+  const width = userWidth ?? restoredWidth
+  const setWidth = React.useCallback((next: number, persist = true) => {
+    const clamped = clampSidebarWidth(next)
+    setUserWidth(clamped)
+    document.documentElement.style.setProperty("--sidebar-width-user", `${clamped}rem`)
+    if (persist) document.cookie = `${SIDEBAR_WIDTH_COOKIE}=${clamped}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+  }, [])
+
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
@@ -133,14 +165,19 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      width,
+      setWidth,
+      resizing,
+      setResizing,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width, setWidth, resizing]
   )
 
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
+        data-resizing={resizing ? "" : undefined}
         style={
           {
             // 저장된 너비(인라인 스크립트가 html 에 둔 --sidebar-width-user)가 있으면 그것, 없으면 기본값
@@ -289,24 +326,67 @@ function SidebarTrigger({
   )
 }
 
-function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = useSidebar()
+// 사이드바 오른쪽 가장자리의 너비 조절 핸들. 드래그·방향키(1rem)·Home/End·더블클릭(기본값). 보이는 선은 hover·포커스·드래그 중에만 signal
+function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div">) {
+  const { width, setWidth, resizing, setResizing, isMobile, state } = useSidebar()
+  if (isMobile || state === "collapsed") return null
+
+  const toRem = (clientX: number) => clampSidebarWidth(clientX / REM_PX)
+
+  // 드래그는 window 에서 듣는다(핸들이 폭을 따라 움직여도 끊기지 않게). 놓으면 그때 저장한다.
+  // 기본 동작(글자 선택·드래그 시작)은 막고 포커스는 직접 준다(누른 뒤 방향키를 쓸 수 있게). 움직이지 않은 클릭은 너비를 바꾸지 않는다
+  function startDrag(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.focus()
+    setResizing(true)
+    let last: number | null = null
+    const move = (ev: PointerEvent) => {
+      last = ev.clientX
+      setWidth(toRem(last), false)
+    }
+    const stop = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", stop)
+      window.removeEventListener("pointercancel", stop)
+      setResizing(false)
+      // 마지막으로 끈 자리를 저장한다(cancel 이벤트의 좌표는 0 이라 쓰지 않는다)
+      if (last !== null) setWidth(toRem(last))
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", stop)
+    window.addEventListener("pointercancel", stop)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const next =
+      e.key === "ArrowRight" ? width + SIDEBAR_WIDTH_STEP
+      : e.key === "ArrowLeft" ? width - SIDEBAR_WIDTH_STEP
+      : e.key === "Home" ? SIDEBAR_WIDTH_MIN
+      : e.key === "End" ? SIDEBAR_WIDTH_MAX
+      : null
+    if (next === null) return
+    e.preventDefault()
+    setWidth(next)
+  }
 
   return (
-    <button
-      data-sidebar="rail"
-      data-slot="sidebar-rail"
-      aria-label="Toggle Sidebar"
-      tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Toggle Sidebar"
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="사이드바 너비"
+      aria-valuemin={SIDEBAR_WIDTH_MIN * REM_PX}
+      aria-valuemax={SIDEBAR_WIDTH_MAX * REM_PX}
+      aria-valuenow={Math.round(width * REM_PX)}
+      tabIndex={0}
+      data-slot="sidebar-resize-handle"
+      data-resizing={resizing ? "" : undefined}
+      onPointerDown={startDrag}
+      onDoubleClick={() => setWidth(SIDEBAR_WIDTH_DEFAULT)}
+      onKeyDown={handleKeyDown}
       className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
-        "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
-        "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
-        "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
-        "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
+        "absolute inset-y-0 -right-1 z-20 hidden w-2 cursor-col-resize touch-none outline-none md:block",
+        "after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 after:bg-transparent hover:after:bg-signal focus-visible:after:bg-signal data-resizing:after:bg-signal",
         className
       )}
       {...props}
@@ -728,7 +808,7 @@ export {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-  SidebarRail,
+  SidebarResizeHandle,
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
