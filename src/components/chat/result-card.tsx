@@ -22,7 +22,7 @@ import { isActive } from "@/lib/jobs/transitions";
 type Handlers = {
   onEdit: (img: ImageDto) => void;
   onRegenerate: (jobs: JobDto[]) => void;
-  onCancel: (jobId: string) => void;
+  onCancel: (jobId: string) => Promise<void>;
   // 공용 삭제 확인창을 연다
   onDelete: (img: ImageDto) => void;
 };
@@ -184,7 +184,8 @@ export const ResultCard = memo(function ResultCard({ jobs, model, priority = fal
             프롬프트 복사
           </Button>
           {!getModel(model).canEdit && images[0] && (
-            <Link href={`/?edit=${images[0].id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "max-md:h-11")}>
+            <Link href={`/?edit=${images[0].id}`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "max-md:h-11")}>
+              <WandSparklesIcon aria-hidden="true" />
               다른 모델로 고치기
             </Link>
           )}

@@ -187,8 +187,9 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       try {
         await apiFetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       } catch (e) {
-        // 이미 끝난 잡(409)은 "이미 끝난 작업이에요." 만 알린다
+        // 이미 끝난 잡(409)은 "이미 끝난 작업이에요." 만 알린다. 던져서 카드가 '중지하는 중…'을 되돌리게 한다
         toast.error(errorMessage(e));
+        throw e;
       } finally {
         void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
       }

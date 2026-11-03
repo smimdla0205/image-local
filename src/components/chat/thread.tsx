@@ -40,7 +40,7 @@ type Props = {
   detail: ConversationDetailDto;
   onEdit: (img: ImageDto) => void;
   onRegenerate: (jobs: JobDto[]) => void;
-  onCancel: (jobId: string) => void;
+  onCancel: (jobId: string) => Promise<void>;
   onDelete: (img: ImageDto) => void;
 };
 

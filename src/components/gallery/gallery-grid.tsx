@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "cn";
-import { DownloadIcon, Maximize2Icon, PencilIcon, Trash2Icon } from "lucide-react";
+import { DownloadIcon, Maximize2Icon, PencilIcon, Trash2Icon, WandSparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { memo } from "react";
 
@@ -40,9 +40,15 @@ const GalleryTile = memo(function GalleryTile({ img, order, onDelete }: { img: I
         <ViewerLink imageId={img.id} aria-label="크게 보기" className={FLOAT_CLASS}>
           <Maximize2Icon aria-hidden="true" className="size-4" />
         </ViewerLink>
+        {/* 고칠 수 있는 모델은 그 대화에서 이어서, 못 하는 모델(MOSS)은 새 대화에서 다른 모델로(대화 결과 타일과 같다) */}
         {spec?.canEdit && img.conversationId && (
           <Link href={`/c/${img.conversationId}?target=${img.id}`} aria-label="이어서 고치기" className={FLOAT_CLASS}>
             <PencilIcon aria-hidden="true" className="size-4" />
+          </Link>
+        )}
+        {spec && !spec.canEdit && (
+          <Link href={`/?edit=${img.id}`} aria-label="다른 모델로 고치기" className={FLOAT_CLASS}>
+            <WandSparklesIcon aria-hidden="true" className="size-4" />
           </Link>
         )}
         <a href={img.url} download={`imagen-${img.id}.png`} aria-label="다운로드" className={FLOAT_CLASS}>
