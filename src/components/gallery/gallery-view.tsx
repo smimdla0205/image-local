@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api-client";
 import { isModelId } from "@/lib/gpu/models";
 import type { ImageDto, ImageListDto } from "@/lib/jobs/schemas";
-import { replaceSearch, useLocationSearch } from "@/lib/location-search";
+import { LocationSync, replaceSearch, useLocationSearch } from "@/lib/location-search";
 import { queryKeys } from "@/lib/query-keys";
 
 // 격자 자리. announce: 한 번 낭독할지(더 보기 때는 버튼이 '불러오는 중…' 을 말하므로 끈다)
@@ -63,6 +63,7 @@ export function GalleryView() {
       <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6">
         <GalleryFilters q={filter.q} model={filter.model} onChange={handleFilterChange} />
         <Suspense fallback={<GridSkeleton />}>
+          <LocationSync />
           <GalleryList onDelete={setImageToDelete} />
         </Suspense>
       </div>
@@ -125,26 +126,26 @@ function GalleryList({ onDelete }: { onDelete: (img: ImageDto) => void }) {
     );
   return (
     <div aria-busy={images.isPlaceholderData} className={cn("flex flex-col gap-6 motion-safe:transition-opacity", images.isPlaceholderData && "opacity-60")}>
-        {groupByDate(items, new Date(), (img) => img.createdAt).map((group, i, groups) => (
-          <section key={group.label} className="flex flex-col gap-2">
-            <h2 className="text-label">{group.label}</h2>
-            <GalleryGrid
-              images={group.items}
-              label={`${group.label} 이미지`}
-              startIndex={groups.slice(0, i).reduce((n, g) => n + g.items.length, 0)}
-              onDelete={onDelete}
-            />
-          </section>
-        ))}
-        {images.isFetchingNextPage && <GridSkeleton announce={false} />}
-        {images.hasNextPage && (
-          <div className="flex flex-col items-center gap-2">
-            <Button type="button" variant="outline" className="max-md:h-11" disabled={images.isFetchingNextPage} onClick={() => void images.fetchNextPage()}>
-              {images.isFetchingNextPage ? "불러오는 중…" : "더 보기"}
-            </Button>
-            {images.isFetchNextPageError && <p className="text-caption text-muted-foreground">더 불러오지 못했어요. 다시 눌러 주세요</p>}
-          </div>
-        )}
-      </div>
-    );
+      {groupByDate(items, new Date(), (img) => img.createdAt).map((group, i, groups) => (
+        <section key={group.label} className="flex flex-col gap-2">
+          <h2 className="text-label">{group.label}</h2>
+          <GalleryGrid
+            images={group.items}
+            label={`${group.label} 이미지`}
+            startIndex={groups.slice(0, i).reduce((n, g) => n + g.items.length, 0)}
+            onDelete={onDelete}
+          />
+        </section>
+      ))}
+      {images.isFetchingNextPage && <GridSkeleton announce={false} />}
+      {images.hasNextPage && (
+        <div className="flex flex-col items-center gap-2">
+          <Button type="button" variant="outline" className="max-md:h-11" disabled={images.isFetchingNextPage} onClick={() => void images.fetchNextPage()}>
+            {images.isFetchingNextPage ? "불러오는 중…" : "더 보기"}
+          </Button>
+          {images.isFetchNextPageError && <p className="text-caption text-muted-foreground">더 불러오지 못했어요. 다시 눌러 주세요</p>}
+        </div>
+      )}
+    </div>
+  );
 }

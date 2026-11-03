@@ -17,8 +17,11 @@ import { readFileIfExists, storageKey } from "@/lib/storage";
 
 export type CreateJobsInput = z.output<typeof createJobsBodySchema>;
 
-// 지금 워커에 보내는 중인 잡 id(한 프로세스 안). 응답 뒤 제출과 그 사이 들어온 폴링 동기화가 같은 잡을 두 번 보내지 않게 한다
-const submitting = new Set<string>();
+type SubmitResult = "submitted" | "unavailable";
+
+// 지금 워커에 보내는 중인 잡의 결과(한 프로세스 안). 응답 뒤 제출과 그 사이 들어온 폴링 동기화가 같은 잡을 두 번 보내지 않고,
+// 뒤에 온 쪽은 같은 결과(워커에 닿았는지)를 받는다
+const inflight = new Map<string, Promise<SubmitResult>>();
 
 const TITLE_MAX = 40;
 
@@ -88,12 +91,20 @@ async function markFailed(jobId: string, error: string): Promise<void> {
 // 워커에 잡 하나를 보낸다. 워커를 지금 쓸 수 없으면 'unavailable'(DB 그대로, 다음 동기화가 다시 보낸다).
 // 잡 자체의 문제(워커 4xx·입력 이미지 없음)는 그 잡을 FAILED 로 바꾸고 'submitted'.
 // inputIds: 같은 배치에서 같은 입력 이미지를 한 번만 올리도록 이미지 id → 워커 input_id 를 기억한다
-export async function submitToWorker(job: JobWithImages, inputIds: Map<string, string> = new Map()): Promise<"submitted" | "unavailable"> {
-  // 다른 요청이 이 잡을 보내는 중이면 건너뛴다(그쪽이 제출 시각을 남기거나 실패로 바꾼다)
-  if (submitting.has(job.id)) return "submitted";
-  submitting.add(job.id);
+export function submitToWorker(job: JobWithImages, inputIds: Map<string, string> = new Map()): Promise<SubmitResult> {
+  const pending = inflight.get(job.id);
+  if (pending) return pending;
+  const result = sendToWorker(job, inputIds).finally(() => inflight.delete(job.id));
+  inflight.set(job.id, result);
+  return result;
+}
+
+async function sendToWorker(job: JobWithImages, inputIds: Map<string, string>): Promise<SubmitResult> {
   const client = getWorkerClient();
   try {
+    // 받은 잡은 응답 전의 스냅숏이다. 그 사이 다른 쪽이 보냈거나(submittedAt) 취소·완료됐으면 보내지 않는다(입력 업로드·GPU 낭비 없이)
+    const fresh = await prisma.job.findUnique({ where: { id: job.id }, select: { submittedAt: true, status: true } });
+    if (!fresh || fresh.submittedAt !== null || !ACTIVE_STATUSES.includes(fresh.status)) return "submitted";
     let inputId: string | null = null;
     if (job.kind === "EDIT") {
       if (!job.inputImage) {
@@ -137,8 +148,6 @@ export async function submitToWorker(job: JobWithImages, inputIds: Map<string, s
       return "submitted";
     }
     throw e;
-  } finally {
-    submitting.delete(job.id);
   }
 }
 

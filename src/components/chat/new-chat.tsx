@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { Suspense, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components/chat/composer";
@@ -12,7 +12,7 @@ import { Topbar } from "@/components/shell/topbar";
 import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId, MODELS } from "@/lib/gpu/models";
 import { parseId } from "@/lib/jobs/constants";
-import { useLocationSearch } from "@/lib/location-search";
+import { LocationSync, useLocationSearch } from "@/lib/location-search";
 import type { ConversationDetailDto, ImageDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -72,6 +72,9 @@ export function NewChat() {
   return (
     <>
       <Topbar title="새 대화" hideTitle />
+      <Suspense fallback={null}>
+        <LocationSync />
+      </Suspense>
       <section aria-labelledby={heroId} className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-10 pb-16 sm:px-6">
         <h2 id={heroId} className="text-center text-display">
           무엇을 만들까요?
