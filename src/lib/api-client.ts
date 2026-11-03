@@ -16,6 +16,11 @@ export class ApiClientError extends Error {
   }
 }
 
+// 없는 것(404). 다시 물어도 같으므로 재시도하지 않고, 화면은 '찾을 수 없어요'로 안내한다
+export function isNotFound(e: unknown): boolean {
+  return e instanceof ApiClientError && e.status === 404;
+}
+
 // 알림에 쓸 문구. API·네트워크 오류는 그 문구를, 그 밖의 오류는 fallback 을 쓴다
 export function errorMessage(e: unknown, fallback = FALLBACK_MESSAGE): string {
   return e instanceof ApiClientError ? e.message : fallback;

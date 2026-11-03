@@ -13,7 +13,7 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui
 import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { apiFetch, isNotFound } from "@/lib/api-client";
 import { parseId, promptAlt } from "@/lib/jobs/constants";
 import { findImage } from "@/lib/jobs/find-image";
 import type { ConversationDetailDto, ImageDto, ImageListDto } from "@/lib/jobs/schemas";
@@ -37,7 +37,7 @@ function ViewerSkeleton() {
   return (
     <div aria-busy="true" className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <span className="sr-only">불러오는 중…</span>
-      <Skeleton aria-hidden="true" className="aspect-square w-full" />
+      <Skeleton className="aspect-square w-full" />
       <div aria-hidden="true" className="flex flex-col gap-3">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-11/12" />
@@ -62,13 +62,14 @@ export function ImageViewerDialog() {
   const id = parseId(searchParams.get("image"));
   // 방금 휴지통으로 옮긴 id. 주소에서 image 가 빠지기 전까지 그 id 를 다시 불러 404 가 나지 않게 한다
   const [deletedId, setDeletedId] = useState<string | null>(null);
+  // 닫히면(주소에서 image 가 빠지면) 잊는다. 같은 이미지를 되돌려 다시 열 수 있다
+  if (id === null && deletedId !== null) setDeletedId(null);
   const image = useQuery({
     queryKey: queryKeys.images.detail(id ?? ""),
     queryFn: () => apiFetch<ImageDto>(`/api/images/${id}`),
     enabled: id !== null && id !== deletedId,
     // 갤러리·대화에서 이미 받은 정보가 있으면 그것으로 바로 연다(새 정보는 받는 대로 바꾼다)
     placeholderData: () => (id ? findCachedImage(queryClient, id) : undefined),
-    retry: (count, e) => !(e instanceof ApiClientError && e.status === 404) && count < 2,
   });
 
   function close() {
@@ -100,7 +101,7 @@ export function ImageViewerDialog() {
         {image.isPending ? (
           <ViewerSkeleton />
         ) : image.isError ? (
-          image.error instanceof ApiClientError && image.error.status === 404 ? (
+          isNotFound(image.error) ? (
             <p className="grid min-h-64 place-items-center px-4 text-caption text-muted-foreground">이미지를 찾을 수 없어요</p>
           ) : (
             <LoadError align="center" message="이미지를 불러오지 못했어요" onRetry={() => void image.refetch()} className="min-h-64" />

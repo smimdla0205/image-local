@@ -14,7 +14,7 @@ import { PollingLostBanner, WorkerBanner } from "@/components/chat/worker-banner
 import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
+import { apiFetch, errorMessage, isNotFound } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { ratioFromSize } from "@/lib/gpu/sizes";
 import { findImage } from "@/lib/jobs/find-image";
@@ -29,11 +29,6 @@ const QUEUED_POLL_MS = 3000;
 
 function scrollToBottom(): void {
   window.scrollTo({ top: document.documentElement.scrollHeight });
-}
-
-// 대화가 사라졌다(다른 탭에서 휴지통으로 갔거나 비워졌다)
-function isGone(error: unknown): boolean {
-  return error instanceof ApiClientError && error.status === 404;
 }
 
 function hasActiveJobs(detail: ConversationDetailDto | undefined): boolean {
@@ -72,12 +67,11 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     staleTime: (q) => (hasActiveJobs(q.state.data) ? 0 : IDLE_STALE_MS),
     refetchOnWindowFocus: (q) => hasActiveJobs(q.state.data),
     enabled: !deleting,
-    // 404 는 대화가 사라진 것이라 다시 묻지 않는다. 그 밖의 오류는 잠시 끊긴 것으로 보고 폴링을 이어 간다
-    retry: (count, error) => !isGone(error) && count < 3,
+    // 404(대화가 다른 탭에서 휴지통으로 갔거나 비워짐)면 폴링을 멈춘다. 그 밖의 오류는 잠시 끊긴 것으로 보고 이어 간다
     refetchInterval: (q) => {
-      if (isGone(q.state.error)) return false;
+      if (isNotFound(q.state.error)) return false;
+      if (!hasActiveJobs(q.state.data)) return false;
       const jobs = q.state.data?.jobs ?? [];
-      if (!jobs.some((j) => isActive(j.status))) return false;
       // 단계가 실제로 나아갈 때만 짧게 묻는다(대기나 0 step — GPU 가 깨는 동안 — 은 3초)
       return jobs.some((j) => j.status === "RUNNING" && j.step > 0) ? POLL_MS : QUEUED_POLL_MS;
     },
@@ -85,7 +79,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const detail = query.data;
   const model = detail.model as ModelId;
   const spec = getModel(model);
-  const gone = query.isError && isGone(query.error);
+  const gone = query.isError && isNotFound(query.error);
 
   // 고칠 이미지: 직접 고른 것(manualTarget) > 최신 요청의 첫 결과(자동 첨부). × 로 뺀 요청은 다시 붙이지 않는다
   // ?target= 은 처음 열 때뿐 아니라 같은 대화 안에서 바뀔 때(뷰어의 '이어서 고치기')도 반영한다(렌더 중 조정)
@@ -144,7 +138,8 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     async (body: Omit<ComposerSubmit, "count"> & { count: number }) => {
       const created = await apiFetch<JobsDto>(`/api/conversations/${id}/jobs`, { method: "POST", json: body });
       queryClient.setQueryData<ConversationDetailDto>(queryKeys.conversations.detail(id), (old) =>
-        old ? { ...old, jobs: [...old.jobs, ...created.jobs], worker: created.worker } : old,
+        // 접수는 응답 뒤라 응답의 worker 는 아직 모르는 값이다. 캐시의 값을 두고 다음 폴링이 바꾼다
+        old ? { ...old, jobs: [...old.jobs, ...created.jobs] } : old,
       );
       // 상세는 위에서 바로 채웠고 진행 중인 잡이 있으면 폴링이 다시 불러오므로 목록만 새로 받는다
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
@@ -201,7 +196,6 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
 
   // 이미지 삭제 확인창(공용). 지운 이미지가 고칠 이미지 칩이면 칩을 뺀다(자동 첨부는 남은 결과로 다시 정해진다)
   const [imageToDelete, setImageToDelete] = useState<ImageDto | null>(null);
-  const handleDeleteRequest = useCallback((img: ImageDto) => setImageToDelete(img), []);
   function handleDeleted(deletedId: string) {
     setManualTarget((t) => (t?.imageId === deletedId ? null : t));
   }
@@ -216,7 +210,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
         ) : (
           <>
             {query.isError ? <PollingLostBanner /> : !detail.worker.reachable && <WorkerBanner />}
-            <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} onDelete={handleDeleteRequest} />
+            <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} onDelete={setImageToDelete} />
           </>
         )}
       </div>
@@ -239,9 +233,9 @@ export function ThreadSkeleton() {
   return (
     <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-20 pb-6 sm:px-6" aria-busy="true">
       <span className="sr-only">불러오는 중…</span>
-      <Skeleton aria-hidden="true" className="ml-auto h-10 w-2/3" />
-      <Skeleton aria-hidden="true" className="aspect-square w-full max-w-md" />
-      <Skeleton aria-hidden="true" className="mt-auto h-32" />
+      <Skeleton className="ml-auto h-10 w-2/3" />
+      <Skeleton className="aspect-square w-full max-w-md" />
+      <Skeleton className="mt-auto h-32" />
     </div>
   );
 }

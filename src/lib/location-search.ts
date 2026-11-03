@@ -1,3 +1,5 @@
+"use client";
+
 import { useSearchParams } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
@@ -29,7 +31,7 @@ export function replaceSearch(query: string): void {
   notify();
 }
 
-// Next 가 주소를 바꾸면(같은 화면에서 링크 이동·뷰어의 pushState 등) 스토어에 알린다. useSearchParams 를 쓰므로 Suspense 안에 둔다(그리는 것은 없다)
+// Next 가 주소를 바꾸면(같은 화면에서 링크 이동·뷰어의 pushState 등) 스토어에 알린다. 앱 틀의 Suspense 안에 하나만 둔다(그리는 것은 없다)
 export function LocationSync(): null {
   const searchParams = useSearchParams();
   useEffect(() => {

@@ -2,17 +2,17 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Suspense, useId, useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components/chat/composer";
 import { ModelPicker } from "@/components/chat/model-picker";
 import { TargetChipNotice, TargetChipSkeleton, toTarget } from "@/components/chat/target-chip";
 import { Topbar } from "@/components/shell/topbar";
-import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
+import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId, MODELS } from "@/lib/gpu/models";
 import { parseId } from "@/lib/jobs/constants";
-import { LocationSync, useLocationSearch } from "@/lib/location-search";
+import { useLocationSearch } from "@/lib/location-search";
 import type { ConversationDetailDto, ImageDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -35,18 +35,12 @@ export function NewChat() {
     queryKey: queryKeys.images.detail(linkedId ?? ""),
     queryFn: () => apiFetch<ImageDto>(`/api/images/${linkedId}`),
     enabled: linkedId !== null,
-    // 없는 이미지(404)는 다시 물어도 같다
-    retry: (count, e) => !(e instanceof ApiClientError && e.status === 404) && count < 2,
   });
   const target = manualTarget ?? (linked.data && !linkedDismissed ? toTarget(linked.data) : null);
-  // 고칠 이미지를 받는 동안·못 찾았을 때 칩 자리에 보일 것
+  // 고칠 이미지를 받는 동안·못 찾았을 때 칩 자리에 보일 것(입력창은 target 이 있으면 칩을, 없으면 이 자리를 그린다)
   const linkedSlot =
-    linkedId !== null && !linkedDismissed && !manualTarget ? (
-      linked.isPending ? (
-        <TargetChipSkeleton label="불러오는 중…" />
-      ) : linked.isError ? (
-        <TargetChipNotice message="고칠 이미지를 찾을 수 없어요" onDismiss={() => setLinkedDismissed(true)} />
-      ) : null
+    linkedId !== null && !linkedDismissed ? (
+      linked.isError ? <TargetChipNotice message="고칠 이미지를 찾을 수 없어요" onDismiss={() => setLinkedDismissed(true)} /> : <TargetChipSkeleton label="불러오는 중…" />
     ) : null;
   // 고칠 이미지가 있으면 고칠 수 없는 모델은 고를 수 없다(이미 골랐다면 고칠 수 있는 모델로 보낸다)
   const selected: ModelId = target && !getModel(model).canEdit ? EDIT_FALLBACK_ID : model;
@@ -72,9 +66,6 @@ export function NewChat() {
   return (
     <>
       <Topbar title="새 대화" hideTitle />
-      <Suspense fallback={null}>
-        <LocationSync />
-      </Suspense>
       <section aria-labelledby={heroId} className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-10 pb-16 sm:px-6">
         <h2 id={heroId} className="text-center text-display">
           무엇을 만들까요?

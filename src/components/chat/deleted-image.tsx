@@ -4,20 +4,16 @@ import { cn } from "cn";
 import { ImageOffIcon } from "lucide-react";
 import Link from "next/link";
 
-type Props = {
-  // 결과 격자(tile)는 지운 이미지(잡)의 원래 비율로 자리를 지킨다. 말풍선(ref)은 입력 썸네일 자리(정사각)
-  width: number;
-  height: number;
-  size: "tile" | "ref";
-};
+// 결과 격자(tile)는 지운 이미지(잡)의 원래 비율로 자리를 지킨다. 말풍선(ref)은 입력 썸네일 자리(정사각)
+type Props = { size: "tile"; width: number; height: number } | { size: "ref" };
 
 // 휴지통으로 옮긴 이미지의 자리표시자. 틀은 그대로 두고 복구 링크를 준다
-export function DeletedImage({ width, height, size }: Props) {
-  const tile = size === "tile";
+export function DeletedImage(props: Props) {
+  const tile = props.size === "tile";
   return (
     <div
       data-testid="deleted-image"
-      style={tile ? { aspectRatio: `${width} / ${height}` } : undefined}
+      style={props.size === "tile" ? { aspectRatio: `${props.width} / ${props.height}` } : undefined}
       className={cn(
         "grid place-content-center justify-items-center gap-1 rounded-md bg-muted text-muted-foreground outline-1 outline-dashed outline-border",
         tile ? "w-full -outline-offset-6" : "size-24 -outline-offset-4",

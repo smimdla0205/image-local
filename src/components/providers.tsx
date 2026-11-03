@@ -11,12 +11,17 @@ import { ThemeProvider } from "next-themes";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ApiClientError } from "@/lib/api-client";
 
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
-      // SSR 직후 클라이언트가 같은 데이터를 바로 다시 요청하지 않게 한다
-      queries: { staleTime: 60 * 1000 },
+      queries: {
+        // SSR 직후 클라이언트가 같은 데이터를 바로 다시 요청하지 않게 한다
+        staleTime: 60 * 1000,
+        // 4xx(없음·잘못된 요청)는 다시 물어도 같다. 그 밖(네트워크·5xx)은 잠시 끊긴 것으로 보고 세 번까지
+        retry: (count, e) => !(e instanceof ApiClientError && e.status >= 400 && e.status < 500) && count < 3,
+      },
     },
   });
 }

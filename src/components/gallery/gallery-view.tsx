@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api-client";
 import { isModelId } from "@/lib/gpu/models";
 import type { ImageDto, ImageListDto } from "@/lib/jobs/schemas";
-import { LocationSync, replaceSearch, useLocationSearch } from "@/lib/location-search";
+import { replaceSearch, useLocationSearch } from "@/lib/location-search";
 import { queryKeys } from "@/lib/query-keys";
 
 // 격자 자리. announce: 한 번 낭독할지(더 보기 때는 버튼이 '불러오는 중…' 을 말하므로 끈다)
@@ -63,7 +63,6 @@ export function GalleryView() {
       <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6">
         <GalleryFilters q={filter.q} model={filter.model} onChange={handleFilterChange} />
         <Suspense fallback={<GridSkeleton />}>
-          <LocationSync />
           <GalleryList onDelete={setImageToDelete} />
         </Suspense>
       </div>

@@ -18,7 +18,7 @@ export function toTarget(img: ImageDto): ComposerTarget {
 export function TargetChipSkeleton({ label }: { label: string }) {
   return (
     <div role="status" aria-busy="true" className="flex items-center gap-3 rounded-md bg-muted p-1 pr-2">
-      <Skeleton aria-hidden="true" className="size-12 shrink-0 rounded-sm bg-secondary" />
+      <Skeleton className="size-12 shrink-0 rounded-sm bg-secondary" />
       <p className="text-label text-muted-foreground">{label}</p>
     </div>
   );

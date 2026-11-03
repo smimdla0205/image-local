@@ -75,10 +75,12 @@ imagen-local/
 │   │   ├── page.tsx           # 새 대화: 모델 고르기 + 입력창
 │   │   ├── c/[id]/            # 대화 화면, 없는 대화 화면
 │   │   ├── gallery/           # 갤러리: 검색·모델 필터
+│   │   ├── trash/             # 휴지통: 삭제한 대화·이미지 복구·영구 삭제·비우기
 │   │   └── api/
-│   │       ├── conversations/ # 목록·생성, [id] 조회(워커 동기화)·삭제, [id]/jobs 잡 추가·진행 중인 잡만 동기화(?ids=)
+│   │       ├── conversations/ # 목록·생성, [id] 조회(워커 동기화)·삭제(휴지통), [id]/restore 복구, [id]/jobs 잡 추가·진행 중인 잡만 동기화(?ids=)
 │   │       ├── jobs/[id]/     # GET 상태(워커 폴링 동기화)·DELETE 취소
-│   │       ├── images/        # 갤러리 목록, [id] 조회·삭제
+│   │       ├── images/        # 갤러리 목록, [id] 조회·삭제(휴지통), [id]/restore 복구, [id]/refs 참조 수
+│   │       ├── trash/         # 휴지통 목록, DELETE 비우기·영구 삭제
 │   │       ├── uploads/       # 고칠 사진 올리기
 │   │       └── files/         # 저장한 원본 PNG·썸네일·화면용 WebP(previews) 서빙. 화면용이 없는 이전 이미지는 처음 요청할 때 만든다
 │   ├── components/
@@ -86,9 +88,11 @@ imagen-local/
 │   │   ├── fade-image.tsx     # 받는 동안 자리(.image-frame)를 깜빡이고 다 받으면 나타나는 img
 │   │   ├── ui/                # shadcn 생성물
 │   │   ├── shell/             # 앱 틀, 사이드바(대화 목록), 상단바
-│   │   ├── chat/              # 새 대화, 대화 화면, 입력창, 결과·진행 카드, 비교 슬라이더
+│   │   ├── chat/              # 새 대화, 대화 화면, 입력창, 결과·진행 카드, 비교 슬라이더, 삭제한 이미지·대화 자리
 │   │   ├── gallery/           # 갤러리 격자·필터
-│   │   └── viewer/            # 이미지 뷰어(?image= 딥링크), 주소만 바꿔 여는 ViewerLink
+│   │   ├── trash/             # 휴지통 목록·행
+│   │   ├── image-delete-dialog.tsx # 이미지 삭제 확인창(되돌리기 토스트). 타일·뷰어가 같이 쓴다
+│   │   └── viewer/            # 이미지 뷰어(?image= 딥링크, 처음 열 때 받는 지연 로드 ViewerSlot), 주소만 바꿔 여는 ViewerLink
 │   ├── hooks/
 │   ├── lib/
 │   │   ├── db.ts              # Prisma 클라이언트 (better-sqlite3 어댑터)
@@ -96,11 +100,13 @@ imagen-local/
 │   │   ├── api/               # API 오류 응답, 라우트 공통 검사(Host·출처)
 │   │   ├── api-client.ts      # 브라우저 → 앱 API 호출
 │   │   ├── query-keys.ts      # React Query 키
+│   │   ├── location-search.ts # 브라우저 주소의 쿼리스트링 스토어(정적 셸에 들어가는 필터·?edit= 가 쓴다)
+│   │   ├── sidebar-width.ts   # 사이드바 너비 범위와 쿠키
 │   │   ├── streams.ts         # 크기 상한을 세며 스트림 읽기
 │   │   ├── storage/           # 이미지 저장. 로컬 파일 → S3 로 바꾸는 자리
 │   │   ├── images/            # sharp: 회전 보정·축소·썸네일·화면용 WebP
 │   │   ├── gpu/               # config.ts(GPU 종류·개수), 모델 표, 크기 표, 워커 HTTP 클라이언트
-│   │   └── jobs/              # 잡 만들기·조회·워커 동기화·상태 전이
+│   │   └── jobs/              # 잡 만들기·조회·워커 동기화·상태 전이, 휴지통(trash.ts: 삭제·복구·비우기·30일 정리), 클라이언트용 상수(constants.ts)
 │   └── generated/prisma/      # prisma generate 결과물. git 에 올리지 않는다
 ├── gpu/                       # Modal GPU 워커(Python). 'GPU 워커' 절 참고
 │   ├── modal_app.py           # 웹 함수·GPU 클래스·모델 다운로드

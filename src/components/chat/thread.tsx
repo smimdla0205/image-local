@@ -29,7 +29,7 @@ function UserBubble({ job }: { job: JobDto }) {
             <figcaption className="absolute bottom-1 left-1 rounded-sm bg-overlay px-1.5 text-micro text-overlay-foreground">버전 {job.inputImage.version}</figcaption>
           </figure>
         ) : (
-          <DeletedImage width={96} height={96} size="ref" />
+          <DeletedImage size="ref" />
         ))}
       <p className="max-w-[80%] rounded-lg bg-secondary px-4 py-2.5 whitespace-pre-wrap">{job.prompt}</p>
     </div>
