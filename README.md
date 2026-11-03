@@ -8,7 +8,7 @@ Hugging Face 오픈 웨이트 이미지 모델을 빌린 GPU 에 올려 쓰는 �
 cp .env.example .env
 npm install          # postinstall 이 Prisma 클라이언트도 생성한다
 npm run db:migrate   # dev.db 생성, 마이그레이션 적용
-npm run dev          # http://127.0.0.1:3000
+npm run dev          # http://127.0.0.1:3711
 ```
 
 앱이 읽는 키:
@@ -26,8 +26,8 @@ GPU 없이 돌리려면 작업공간 루트에서 `npm run qa:worker:mock`(8787)
 
 | 명령 | 하는 일 |
 |---|---|
-| `npm run dev` | 개발 서버 (Turbopack) |
-| `npm run build`, `npm start` | 프로덕션 빌드, 실행 |
+| `npm run dev` | 개발 서버 (Turbopack), 3711 |
+| `npm run build`, `npm start` | 프로덕션 빌드, 실행. 3710 (`img.smindev.com` 터널이 이 포트로 보낸다) |
 | `npm run lint` | ESLint. Next 규칙 + TanStack Query 규칙 |
 | `npm run typecheck` | 라우트 타입 생성 후 `tsc --noEmit` |
 | `npm run db:migrate -- --name <이름>` | 스키마 변경을 마이그레이션으로 만들고 적용 |
