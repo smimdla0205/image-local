@@ -1,18 +1,18 @@
 "use client";
 
 import { cn } from "cn";
-import { DownloadIcon, Maximize2Icon, PencilIcon } from "lucide-react";
+import { DownloadIcon, Maximize2Icon, PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { FLOAT_CLASS } from "@/components/chat/result-card";
+import { FLOAT_CLASS } from "@/components/chat/styles";
 import { FadeImage } from "@/components/fade-image";
 import { ViewerLink } from "@/components/viewer/viewer-link";
 import { getModel } from "@/lib/gpu/models";
 import type { ImageDto } from "@/lib/jobs/schemas";
 
-// 갤러리 타일 격자. 크게 보기는 지금 검색·필터를 남긴 채 ?image= 를 붙인다
-export function GalleryGrid({ images, label }: { images: ImageDto[]; label: string }) {
+// 갤러리 타일 격자. 크게 보기는 지금 검색·필터를 남긴 채 ?image= 를 붙인다. 삭제는 공용 확인창을 연다
+export function GalleryGrid({ images, label, onDelete }: { images: ImageDto[]; label: string; onDelete: (img: ImageDto) => void }) {
   const searchParams = useSearchParams();
   const viewHref = (id: string) => {
     const params = new URLSearchParams(searchParams);
@@ -46,6 +46,9 @@ export function GalleryGrid({ images, label }: { images: ImageDto[]; label: stri
               <a href={img.url} download={`imagen-${img.id}.png`} aria-label="다운로드" className={FLOAT_CLASS}>
                 <DownloadIcon aria-hidden="true" className="size-4" />
               </a>
+              <button type="button" aria-label="삭제" onClick={() => onDelete(img)} className={FLOAT_CLASS}>
+                <Trash2Icon aria-hidden="true" className="size-4" />
+              </button>
             </div>
           </li>
         );

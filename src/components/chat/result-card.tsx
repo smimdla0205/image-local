@@ -1,13 +1,14 @@
 "use client";
 
 import { cn } from "cn";
-import { CopyIcon, DownloadIcon, Maximize2Icon, PencilIcon, RefreshCwIcon, WandSparklesIcon } from "lucide-react";
+import { CopyIcon, DownloadIcon, Maximize2Icon, PencilIcon, RefreshCwIcon, Trash2Icon, WandSparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { memo } from "react";
 import { toast } from "sonner";
 
 import { CompareSlider } from "@/components/chat/compare-slider";
 import { JobCard } from "@/components/chat/job-card";
+import { FLOAT_CLASS } from "@/components/chat/styles";
 import { FadeImage } from "@/components/fade-image";
 import { ViewerLink } from "@/components/viewer/viewer-link";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +17,17 @@ import { getModel, type ModelId } from "@/lib/gpu/models";
 import type { ImageDto, JobDto } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 
-export const FLOAT_CLASS =
-  "inline-grid size-8 place-items-center rounded-md bg-overlay text-overlay-foreground transition-colors outline-none hover:bg-secondary hover:text-secondary-foreground focus-visible:shadow-focus-ring max-md:size-11";
+type Handlers = {
+  onEdit: (img: ImageDto) => void;
+  onRegenerate: (jobs: JobDto[]) => void;
+  onCancel: (jobId: string) => void;
+  // 공용 삭제 확인창을 연다
+  onDelete: (img: ImageDto) => void;
+};
+type TileHandlers = Pick<Handlers, "onEdit" | "onDelete">;
 
-type Handlers = { onEdit: (img: ImageDto) => void; onRegenerate: (jobs: JobDto[]) => void; onCancel: (jobId: string) => void };
-
-// 이미지 위 액션: 크게 보기 · 이어서 고치기(MOSS 는 다른 모델로 고치기) · 다운로드
-function TileActions({ image, model, onEdit }: { image: ImageDto; model: ModelId; onEdit: Handlers["onEdit"] }) {
+// 이미지 위 액션: 크게 보기 · 이어서 고치기(MOSS 는 다른 모델로 고치기) · 다운로드 · 삭제
+function TileActions({ image, model, onEdit, onDelete }: { image: ImageDto; model: ModelId } & TileHandlers) {
   return (
     <div className="hover-actions absolute top-2 right-2 flex gap-1">
       <ViewerLink href={`?image=${image.id}`} aria-label="크게 보기" className={FLOAT_CLASS}>
@@ -40,11 +45,14 @@ function TileActions({ image, model, onEdit }: { image: ImageDto; model: ModelId
       <a href={image.url} download={`imagen-${image.id}.png`} aria-label="다운로드" className={FLOAT_CLASS}>
         <DownloadIcon aria-hidden="true" className="size-4" />
       </a>
+      <button type="button" aria-label="삭제" onClick={() => onDelete(image)} className={FLOAT_CLASS}>
+        <Trash2Icon aria-hidden="true" className="size-4" />
+      </button>
     </div>
   );
 }
 
-function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; onEdit: Handlers["onEdit"] }) {
+function ImageTile({ image, model, onEdit, onDelete }: { image: ImageDto; model: ModelId } & TileHandlers) {
   return (
     <figure className="image-frame group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
@@ -58,7 +66,7 @@ function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; 
           className={cn("block h-auto w-full", image.hasAlpha && "checker")}
         />
       </ViewerLink>
-      <TileActions image={image} model={model} onEdit={onEdit} />
+      <TileActions image={image} model={model} onEdit={onEdit} onDelete={onDelete} />
     </figure>
   );
 }
@@ -76,13 +84,14 @@ function sameBatch(a: ResultCardProps, b: ResultCardProps): boolean {
     a.onEdit === b.onEdit &&
     a.onRegenerate === b.onRegenerate &&
     a.onCancel === b.onCancel &&
+    a.onDelete === b.onDelete &&
     a.jobs.length === b.jobs.length &&
     a.jobs.every((j, i) => j === b.jobs[i])
   );
 }
 
 // 한 요청(배치)의 결과: 배지, 결과 이미지(고치기 1장은 비교 슬라이더), 진행·실패 카드, 다시 생성·프롬프트 복사
-export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel }: ResultCardProps) {
+export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel, onDelete }: ResultCardProps) {
   const first = jobs[0];
   const isEdit = first.kind === "EDIT";
   const active = jobs.filter((j) => isActive(j.status));
@@ -135,14 +144,14 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
         <>
           <div className="group relative">
             <CompareSlider before={slider.before} after={slider.after} />
-            <TileActions image={slider.after} model={model} onEdit={onEdit} />
+            <TileActions image={slider.after} model={model} onEdit={onEdit} onDelete={onDelete} />
           </div>
           <p className="text-caption text-muted-foreground">고치면 요청하지 않은 부분도 조금 바뀔 수 있어요. 마음에 들지 않으면 이전 버전에서 다시 고치세요.</p>
         </>
       ) : (
         succeeded.length > 0 && (
           <div className={cn("grid gap-2", succeeded.length > 1 ? "grid-cols-2" : "max-w-md grid-cols-1")}>
-            {succeeded.map((j) => (j.image ? <ImageTile key={j.id} image={j.image} model={model} onEdit={onEdit} /> : <DeletedImage key={j.id} />))}
+            {succeeded.map((j) => (j.image ? <ImageTile key={j.id} image={j.image} model={model} onEdit={onEdit} onDelete={onDelete} /> : <DeletedImage key={j.id} />))}
           </div>
         )
       )}

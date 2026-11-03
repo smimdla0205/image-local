@@ -4,15 +4,15 @@ import { type InfiniteData, type QueryClient, useQuery, useQueryClient } from "@
 import { cn } from "cn";
 import { XIcon } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { CSSProperties } from "react";
-import { toast } from "sonner";
+import { type CSSProperties, useState } from "react";
 
-import { ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
+import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
 import { FadeImage } from "@/components/fade-image";
+import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
-import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
+import { ApiClientError, apiFetch } from "@/lib/api-client";
 import { findImage } from "@/lib/jobs/find-image";
 import { type ConversationDetailDto, type ImageDto, type ImageListDto, parseId } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
@@ -36,10 +36,12 @@ export function ImageViewerDialog() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const id = parseId(searchParams.get("image"));
+  // 방금 휴지통으로 옮긴 id. 주소에서 image 가 빠지기 전까지 그 id 를 다시 불러 404 가 나지 않게 한다
+  const [deletedId, setDeletedId] = useState<string | null>(null);
   const image = useQuery({
     queryKey: queryKeys.images.detail(id ?? ""),
     queryFn: () => apiFetch<ImageDto>(`/api/images/${id}`),
-    enabled: id !== null,
+    enabled: id !== null && id !== deletedId,
     // 갤러리·대화에서 이미 받은 정보가 있으면 그것으로 바로 연다(새 정보는 받는 대로 바꾼다)
     placeholderData: () => (id ? findCachedImage(queryClient, id) : undefined),
     retry: (count, e) => !(e instanceof ApiClientError && e.status === 404) && count < 2,
@@ -53,24 +55,17 @@ export function ImageViewerDialog() {
     window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
   }
 
-  async function handleDelete() {
-    if (!id) return;
-    try {
-      await apiFetch(`/api/images/${id}`, { method: "DELETE" });
-    } catch (e) {
-      toast.error(errorMessage(e, "이미지를 지우지 못했어요. 다시 시도해 주세요."));
-      return;
-    }
+  // 삭제 확인창(공용). 지우면 뷰어를 닫고, 지운 id 의 캐시는 주소가 바뀐 뒤 버린다
+  const [deleting, setDeleting] = useState<ImageDto | null>(null);
+  function handleDeleted(removedId: string) {
+    setDeletedId(removedId);
     close();
-    // 지운 id 를 다시 불러 404 가 나지 않게 캐시에서 먼저 뺀다
-    queryClient.removeQueries({ queryKey: queryKeys.images.detail(id) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.images.all });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-    toast.success("이미지를 삭제했어요");
+    queryClient.removeQueries({ queryKey: queryKeys.images.detail(removedId) });
   }
 
   return (
     <Dialog open={id !== null} onOpenChange={(open) => !open && close()}>
+      <ImageDeleteDialog image={deleting} onOpenChange={(open) => !open && setDeleting(null)} onDeleted={handleDeleted} />
       <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto p-0 sm:max-w-5xl">
         <div className="flex items-center gap-2 border-b px-4 py-2">
           <DialogTitle className="min-w-0 flex-1 truncate text-label">이미지 자세히 보기</DialogTitle>
@@ -102,7 +97,7 @@ export function ImageViewerDialog() {
                 className={cn("block h-auto max-h-[70dvh] w-full rounded-md object-contain", image.data.hasAlpha && "checker")}
               />
             </div>
-            <ViewerPanel image={image.data} onDelete={handleDelete} />
+            <ViewerPanel image={image.data} onDelete={() => setDeleting(image.data)} />
           </div>
         )}
       </DialogContent>

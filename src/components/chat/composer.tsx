@@ -4,7 +4,8 @@ import { ArrowUpIcon, PaperclipIcon } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type KeyboardEvent, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { ComposerOptions, type Count, ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
+import { ComposerOptions, type Count } from "@/components/chat/composer-options";
+import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
 import { RatioMenu } from "@/components/chat/ratio-menu";
 import { StepMeter } from "@/components/chat/step-meter";
 import { type ComposerTarget, TargetChip, toTarget } from "@/components/chat/target-chip";

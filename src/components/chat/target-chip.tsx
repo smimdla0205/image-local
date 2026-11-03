@@ -2,7 +2,7 @@
 
 import { XIcon } from "lucide-react";
 
-import { ICON_BUTTON_CLASS } from "@/components/chat/composer-options";
+import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
 import { FadeImage } from "@/components/fade-image";
 import type { ImageDto } from "@/lib/jobs/schemas";
 

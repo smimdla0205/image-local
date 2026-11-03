@@ -9,14 +9,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { SEED_MAX } from "@/lib/jobs/schemas";
 
+import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
+
 export const COUNTS = [1, 2, 4] as const;
 export type Count = (typeof COUNTS)[number];
-
-// 지우기 버튼 글자색. 흰(카드) 배경 위 빨강이라 대비 4.5:1 을 넘는다(옅은 빨강 배경 위 빨강은 4.49:1)
-export const DANGER_TEXT = "text-destructive hover:text-destructive dark:text-destructive";
-
-export const ICON_BUTTON_CLASS =
-  "inline-grid size-8 shrink-0 place-items-center rounded-md text-foreground transition-colors outline-none hover:bg-secondary focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent aria-expanded:bg-secondary max-md:size-11";
 
 type Props = {
   count: Count;

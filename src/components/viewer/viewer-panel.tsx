@@ -2,21 +2,10 @@
 
 import { CopyIcon, DownloadIcon, PencilIcon, Trash2Icon, WandSparklesIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { toast } from "sonner";
 
-import { DANGER_TEXT } from "@/components/chat/composer-options";
 import { StepMeter } from "@/components/chat/step-meter";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { DANGER_TEXT } from "@/components/chat/styles";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { getModel } from "@/lib/gpu/models";
 import type { ImageDto } from "@/lib/jobs/schemas";
@@ -30,21 +19,9 @@ async function copy(text: string, done: string) {
   }
 }
 
-// 뷰어 오른쪽 정보: 프롬프트, 모델·방식·step·크기·시드·라이선스, 다운로드·고치기·삭제(확인 뒤 영구 삭제)
-export function ViewerPanel({ image, onDelete }: { image: ImageDto; onDelete: () => Promise<void> }) {
+// 뷰어 오른쪽 정보: 프롬프트, 모델·방식·step·크기·시드·라이선스, 다운로드·고치기·삭제(onDelete 가 공용 확인창을 연다)
+export function ViewerPanel({ image, onDelete }: { image: ImageDto; onDelete: () => void }) {
   const spec = image.model ? getModel(image.model) : null;
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function handleDelete() {
-    setBusy(true);
-    try {
-      await onDelete();
-      setConfirmOpen(false);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -119,26 +96,11 @@ export function ViewerPanel({ image, onDelete }: { image: ImageDto; onDelete: ()
       </div>
 
       <div className="flex border-t pt-4">
-        <Button type="button" variant="outline" className={`${DANGER_TEXT} max-md:h-11`} onClick={() => setConfirmOpen(true)}>
+        <Button type="button" variant="outline" className={`${DANGER_TEXT} max-md:h-11`} onClick={onDelete}>
           <Trash2Icon aria-hidden="true" />
           삭제
         </Button>
       </div>
-
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>이미지를 삭제할까요?</AlertDialogTitle>
-            <AlertDialogDescription>삭제하면 되돌릴 수 없어요.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction variant="outline" disabled={busy} onClick={handleDelete} className={DANGER_TEXT}>
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

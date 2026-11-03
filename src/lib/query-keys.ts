@@ -16,5 +16,10 @@ export const queryKeys = {
     lists: ["images", "list"] as const,
     list: (f: { q?: string; model?: ModelId }) => ["images", "list", f] as const,
     detail: (id: string) => ["images", "detail", id] as const,
+    // 삭제 확인창이 보여 주는 참조 수
+    refs: (id: string) => ["images", "refs", id] as const,
+  },
+  trash: {
+    all: ["trash"] as const,
   },
 };

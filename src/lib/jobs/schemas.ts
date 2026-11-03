@@ -114,7 +114,9 @@ export type TrashImageDto = ImageDto & { deletedAt: string; expiresAt: string };
 export type TrashDto = { conversations: TrashConversationDto[]; images: TrashImageDto[] };
 // GET /api/images/[id]/refs — 이 이미지를 원본으로 둔 고친 버전 수, 입력으로 쓴 요청 수
 export type ImageRefsDto = { children: number; inputFor: number };
-export type ConversationDetailDto = ConversationDto & { jobs: JobDto[]; worker: WorkerState };
+// counts: 삭제 확인창이 말하는 수. images 는 생성·고침 이미지, linkedConversations 는 이 대화의 이미지를 원본으로 쓰는 다른 대화 수
+export type ConversationCounts = { images: number; activeJobs: number; linkedConversations: number };
+export type ConversationDetailDto = ConversationDto & { jobs: JobDto[]; worker: WorkerState; counts: ConversationCounts };
 export type ConversationListDto = { items: ConversationDto[] };
 // 잡 묶음 응답: POST /api/conversations/[id]/jobs(만든 잡), GET 같은 경로(물은 진행 중 잡을 워커와 맞춘 것)
 export type JobsDto = { jobs: JobDto[]; worker: WorkerState };

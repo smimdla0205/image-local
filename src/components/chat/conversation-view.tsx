@@ -10,6 +10,7 @@ import { ConversationMenu } from "@/components/chat/conversation-menu";
 import { toTarget } from "@/components/chat/target-chip";
 import { groupBatches, Thread } from "@/components/chat/thread";
 import { WorkerBanner } from "@/components/chat/worker-banner";
+import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch, errorMessage } from "@/lib/api-client";
@@ -177,12 +178,20 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
 
   const handleEdit = useCallback((img: ImageDto) => setManualTarget(toTarget(img)), []);
 
+  // 이미지 삭제 확인창(공용). 지운 이미지가 고칠 이미지 칩이면 칩을 뺀다(자동 첨부는 남은 결과로 다시 정해진다)
+  const [imageToDelete, setImageToDelete] = useState<ImageDto | null>(null);
+  const handleDeleteRequest = useCallback((img: ImageDto) => setImageToDelete(img), []);
+  function handleDeleted(deletedId: string) {
+    setManualTarget((t) => (t?.imageId === deletedId ? null : t));
+  }
+
   return (
     <>
-      <Topbar title={detail.title ?? "대화"} model={model} actions={<ConversationMenu id={id} onDeletingChange={setDeleting} />} />
+      <Topbar title={detail.title ?? "대화"} model={model} actions={<ConversationMenu id={id} title={detail.title} counts={detail.counts} onDeletingChange={setDeleting} />} />
+      <ImageDeleteDialog image={imageToDelete} onOpenChange={(open) => !open && setImageToDelete(null)} onDeleted={handleDeleted} />
       <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-4 pb-6 sm:px-6">
         {!detail.worker.reachable && <WorkerBanner />}
-        <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} />
+        <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} onDelete={handleDeleteRequest} />
       </div>
       <div className="sticky bottom-0 mx-auto w-full max-w-205 bg-background px-4 pb-4 sm:px-6 sm:pb-6">
         {/* 모델 고정은 상단 자물쇠가, 고칠 이미지는 칩이 알려 준다. 고치기를 못 하는 이유만 여기서 알린다 */}

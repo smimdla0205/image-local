@@ -40,16 +40,17 @@ type Props = {
   onEdit: (img: ImageDto) => void;
   onRegenerate: (jobs: JobDto[]) => void;
   onCancel: (jobId: string) => void;
+  onDelete: (img: ImageDto) => void;
 };
 
 // 대화 스레드: 요청마다 말풍선 + 결과
-export function Thread({ detail, onEdit, onRegenerate, onCancel }: Props) {
+export function Thread({ detail, onEdit, onRegenerate, onCancel, onDelete }: Props) {
   return (
     <div className="flex flex-col gap-8">
       {groupBatches(detail.jobs).map((batch) => (
         <article key={batch.batchId} className="flex flex-col gap-3">
           <UserBubble job={batch.jobs[0]} />
-          <ResultCard jobs={batch.jobs} model={detail.model as ModelId} onEdit={onEdit} onRegenerate={onRegenerate} onCancel={onCancel} />
+          <ResultCard jobs={batch.jobs} model={detail.model as ModelId} onEdit={onEdit} onRegenerate={onRegenerate} onCancel={onCancel} onDelete={onDelete} />
         </article>
       ))}
     </div>

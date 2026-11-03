@@ -3,10 +3,11 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { cn } from "cn";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { type GalleryFilter, GalleryFilters } from "@/components/gallery/gallery-filters";
 import { GalleryGrid } from "@/components/gallery/gallery-grid";
+import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { groupByDate } from "@/components/shell/day-groups";
 import { Topbar } from "@/components/shell/topbar";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { apiFetch } from "@/lib/api-client";
 import { isModelId } from "@/lib/gpu/models";
-import type { ImageListDto } from "@/lib/jobs/schemas";
+import type { ImageDto, ImageListDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
 function GridSkeleton() {
@@ -68,6 +69,7 @@ export function GalleryView() {
 
   const items = images.data?.pages.flatMap((p) => p.items) ?? [];
   const filtered = q !== "" || model !== "";
+  const [imageToDelete, setImageToDelete] = useState<ImageDto | null>(null);
 
   let content: React.ReactNode;
   if (images.isPending) content = <GridSkeleton />;
@@ -80,7 +82,7 @@ export function GalleryView() {
         {groupByDate(items, new Date(), (img) => img.createdAt).map((group) => (
           <section key={group.label} className="flex flex-col gap-2">
             <h2 className="text-label">{group.label}</h2>
-            <GalleryGrid images={group.items} label={`${group.label} 이미지`} />
+            <GalleryGrid images={group.items} label={`${group.label} 이미지`} onDelete={setImageToDelete} />
           </section>
         ))}
         {images.hasNextPage && (
@@ -104,6 +106,7 @@ export function GalleryView() {
   return (
     <>
       <Topbar title="갤러리" />
+      <ImageDeleteDialog image={imageToDelete} onOpenChange={(open) => !open && setImageToDelete(null)} />
       <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6">
         <GalleryFilters q={q} model={model} onChange={handleFilterChange} />
         {content}

@@ -2,7 +2,8 @@
 import type { Conversation, Image, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { isModelId, type ModelId } from "@/lib/gpu/models";
-import { type ConversationDetailDto, type ConversationDto, DETAIL_JOB_LIMIT, type ImageDto, type JobDto, type WorkerState } from "@/lib/jobs/schemas";
+import { type ConversationCounts, type ConversationDetailDto, type ConversationDto, DETAIL_JOB_LIMIT, type ImageDto, type JobDto, type WorkerState } from "@/lib/jobs/schemas";
+import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
 import { type StorageKind, storageKey } from "@/lib/storage";
 
 export const jobInclude = { image: true, inputImage: true } as const satisfies Prisma.JobInclude;
@@ -69,18 +70,35 @@ export function toJobDto(j: JobWithImages): JobDto {
   };
 }
 
+// 삭제 확인창이 말하는 수
+export async function countConversation(id: string): Promise<ConversationCounts> {
+  const [images, activeJobs, linked] = await Promise.all([
+    prisma.image.count({ where: { conversationId: id, kind: { not: "UPLOADED" }, deletedAt: null } }),
+    prisma.job.count({ where: { conversationId: id, status: { in: ACTIVE_STATUSES } } }),
+    prisma.job.findMany({
+      where: { conversationId: { not: id }, conversation: { deletedAt: null }, inputImage: { conversationId: id } },
+      select: { conversationId: true },
+      distinct: ["conversationId"],
+    }),
+  ]);
+  return { images, activeJobs, linkedConversations: linked.length };
+}
+
 // 휴지통 대화는 없는 것으로 다룬다(404)
-export async function getConversationDetail(id: string): Promise<{ conversation: Conversation; jobs: JobWithImages[] } | null> {
+export async function getConversationDetail(id: string): Promise<{ conversation: Conversation; jobs: JobWithImages[]; counts: ConversationCounts } | null> {
   const conversation = await prisma.conversation.findUnique({ where: { id } });
   if (!conversation || conversation.deletedAt) return null;
   // 최신 DETAIL_JOB_LIMIT 개를 가져와 오래된 순으로 돌려준다
-  const recent = await prisma.job.findMany({
-    where: { conversationId: id },
-    include: jobInclude,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: DETAIL_JOB_LIMIT,
-  });
-  return { conversation, jobs: recent.reverse() };
+  const [recent, counts] = await Promise.all([
+    prisma.job.findMany({
+      where: { conversationId: id },
+      include: jobInclude,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: DETAIL_JOB_LIMIT,
+    }),
+    countConversation(id),
+  ]);
+  return { conversation, jobs: recent.reverse(), counts };
 }
 
 // 주어진 id 의 잡만 DB 에서 다시 읽어 같은 자리에 끼운다(나머지는 그대로)
@@ -102,9 +120,9 @@ export function toConversationDto(c: Conversation, thumbImageId: string | null):
   };
 }
 
-export function toConversationDetailDto(c: Conversation, jobs: JobWithImages[], worker: WorkerState): ConversationDetailDto {
+export function toConversationDetailDto(c: Conversation, jobs: JobWithImages[], worker: WorkerState, counts: ConversationCounts): ConversationDetailDto {
   const latestImage = [...jobs].reverse().find((j) => j.image && !j.image.deletedAt)?.image ?? null;
-  return { ...toConversationDto(c, latestImage?.id ?? null), jobs: jobs.map(toJobDto), worker };
+  return { ...toConversationDto(c, latestImage?.id ?? null), jobs: jobs.map(toJobDto), worker, counts };
 }
 
 export async function listConversations(limit: number): Promise<ConversationDto[]> {
