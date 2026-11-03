@@ -114,6 +114,20 @@
 | 폰트·CSS | 렌더 차단 CSS 2개(Tailwind 15KB gz, Pretendard `@font-face` 100개 15KB gz). preload 없음 | `src/app/layout.tsx:7-14` |
 | 가상화 필요 여부 | 사이드바(≤60)·스레드(≤100잡)는 서버 상한이 있어 해당 없음. 갤러리만 수백 장에서 필요 | |
 
+#### 구현 뒤 재측정(production 빌드, 로컬, 스로틀 없음, 같은 데이터)
+
+| 화면 | LCP 전 → 후 | 내역(후) | 비고 |
+|---|---|---|---|
+| `/` | 458ms → 116ms | TTFB 5 + render delay 111 | 제목·모델·입력창이 정적 셸에 들어가 hydration 전에 보인다 |
+| `/gallery` | 603ms → 418ms | TTFB 4 + load delay 156 + render delay 257 | 첫 행 `eager`·`fetchpriority=high`. 목록은 여전히 클라이언트가 받는다 |
+| `/c/[id]` (4장) | 767ms → 422ms | TTFB 4 + load delay 380 + render delay 37 | SSR 이미지가 바로 보인다. load delay 는 PPR 의 동적 조각(스레드)이 스트리밍되는 시간 |
+
+| 항목 | 후 | 비고 |
+|---|---|---|
+| 첫 로드 JS | `/` 16개 스크립트 gzip 300KB, `/gallery` 295KB, `/trash` 275KB | zod·뷰어·AlertDialog 가 초기 JS 에서 빠짐(뷰어는 처음 열 때 받음) |
+| CLS | 0 (3 화면) | |
+| Legacy JS | 14.6KB 폴리필(그대로) | 후속 |
+
 ### 접근성·키보드
 
 | 영역 | 현상 | 근거 |
