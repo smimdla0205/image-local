@@ -44,12 +44,13 @@ export function GalleryView() {
 
   const images = useInfiniteQuery({
     queryKey: queryKeys.images.list({ q: q || undefined, model: model || undefined }),
-    queryFn: ({ pageParam }) => {
+    // signal: 검색·필터가 바뀌어 이 목록을 보는 쪽이 없어지면 받던 요청을 끊는다
+    queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (model) params.set("model", model);
       if (pageParam) params.set("cursor", pageParam);
-      return apiFetch<ImageListDto>(`/api/images?${params.toString()}`);
+      return apiFetch<ImageListDto>(`/api/images?${params.toString()}`, { signal });
     },
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,

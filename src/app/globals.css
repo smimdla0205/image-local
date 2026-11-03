@@ -226,6 +226,11 @@ img[data-loading],
 .image-frame {
   position: relative;
 }
+/* 갤러리 타일: 화면 밖이면 레이아웃·그리기를 건너뛴다. 아직 안 그린 타일의 자리 높이는 240px(한 번 그린 뒤에는 그 크기) */
+.gallery-tile {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
 .image-frame:has(img[data-loading])::before {
   content: "";
   position: absolute;

@@ -32,7 +32,7 @@ type TileHandlers = Pick<Handlers, "onEdit" | "onDelete">;
 function TileActions({ image, model, onEdit, onDelete }: { image: ImageDto; model: ModelId } & TileHandlers) {
   return (
     <div className="hover-actions absolute top-2 right-2 flex gap-1">
-      <ViewerLink href={`?image=${image.id}`} aria-label="크게 보기" className={FLOAT_CLASS}>
+      <ViewerLink imageId={image.id} aria-label="크게 보기" className={FLOAT_CLASS}>
         <Maximize2Icon aria-hidden="true" className="size-4" />
       </ViewerLink>
       {getModel(model).canEdit ? (
@@ -58,7 +58,7 @@ function ImageTile({ image, model, pos, priority, onEdit, onDelete }: { image: I
   return (
     <figure className="image-frame group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
-      <ViewerLink href={`?image=${image.id}`} tabIndex={-1} className="block cursor-zoom-in">
+      <ViewerLink imageId={image.id} tabIndex={-1} className="block cursor-zoom-in">
         <FadeImage
           src={image.previewUrl}
           alt={promptAlt(image.prompt, pos)}
