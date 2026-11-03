@@ -28,6 +28,7 @@ GPU 없이 돌리려면 작업공간 루트에서 `npm run qa:worker:mock`(8787)
 |---|---|
 | `npm run dev` | 개발 서버 (Turbopack), 3711 |
 | `npm run build`, `npm start` | 프로덕션 빌드, 실행. 3710 (`img.smindev.com` 터널이 이 포트로 보낸다) |
+| `npm stop` | 3710·3711 에 떠 있는 서버(하위 프로세스 포함)를 끈다 |
 | `npm run lint` | ESLint. Next 규칙 + TanStack Query 규칙 |
 | `npm run typecheck` | 라우트 타입 생성 후 `tsc --noEmit` |
 | `npm run db:migrate -- --name <이름>` | 스키마 변경을 마이그레이션으로 만들고 적용 |

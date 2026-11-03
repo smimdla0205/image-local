@@ -6,6 +6,7 @@
     "dev": "next dev -H 127.0.0.1 -p 3711",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3710",
+    "stop": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3710,3711 -ErrorAction SilentlyContinue | Where-Object OwningProcess -gt 4 | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { taskkill /PID $_ /T /F }; exit 0\"",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "prisma generate",
