@@ -44,7 +44,8 @@ export function GalleryView() {
 
   const images = useInfiniteQuery({
     queryKey: queryKeys.images.list({ q: q || undefined, model: model || undefined }),
-    // signal: 검색·필터가 바뀌어 이 목록을 보는 쪽이 없어지면 받던 요청을 끊는다
+    // signal: 검색·필터가 바뀌어 이 목록을 보는 쪽이 없어지면 받던 요청을 끊는다(썸네일이 쓸 연결을 돌려준다).
+    // 키가 바뀌지 않는 사이드바·뷰어 요청에는 쓰지 않는다 — 개발 모드 StrictMode 의 두 번 구독으로 첫 요청이 끊기고 다시 가기만 한다
     queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams();
       if (q) params.set("q", q);

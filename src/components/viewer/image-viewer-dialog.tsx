@@ -62,11 +62,9 @@ export function ImageViewerDialog() {
   const id = parseId(searchParams.get("image"));
   // 방금 휴지통으로 옮긴 id. 주소에서 image 가 빠지기 전까지 그 id 를 다시 불러 404 가 나지 않게 한다
   const [deletedId, setDeletedId] = useState<string | null>(null);
-  // 타입 인자: placeholderData 가 함수라 queryFn 의 signal 인자와 함께 두면 추론이 placeholderData 쪽으로 붙는다
-  const image = useQuery<ImageDto>({
+  const image = useQuery({
     queryKey: queryKeys.images.detail(id ?? ""),
-    // signal: 받는 중에 닫으면 요청을 끊는다
-    queryFn: ({ signal }) => apiFetch<ImageDto>(`/api/images/${id}`, { signal }),
+    queryFn: () => apiFetch<ImageDto>(`/api/images/${id}`),
     enabled: id !== null && id !== deletedId,
     // 갤러리·대화에서 이미 받은 정보가 있으면 그것으로 바로 연다(새 정보는 받는 대로 바꾼다)
     placeholderData: () => (id ? findCachedImage(queryClient, id) : undefined),
