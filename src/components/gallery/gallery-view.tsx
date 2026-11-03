@@ -11,6 +11,7 @@ import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { groupByDate } from "@/components/shell/day-groups";
 import { Topbar } from "@/components/shell/topbar";
 import { Button } from "@/components/ui/button";
+import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { apiFetch } from "@/lib/api-client";
@@ -74,7 +75,7 @@ export function GalleryView() {
   let content: React.ReactNode;
   if (images.isPending) content = <GridSkeleton />;
   // 받은 목록이 있으면(다음 페이지만 실패) 격자를 남기고 '더 보기' 옆에서 알린다
-  else if (images.isError && !images.data) content = <p className="py-16 text-center text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
+  else if (images.isError && !images.data) content = <LoadError align="center" message="목록을 불러오지 못했어요" onRetry={() => void images.refetch()} />;
   else if (items.length === 0) content = <p className="py-16 text-center text-caption text-muted-foreground">{filtered ? "찾는 이미지가 없어요" : "아직 만든 이미지가 없어요"}</p>;
   else
     content = (

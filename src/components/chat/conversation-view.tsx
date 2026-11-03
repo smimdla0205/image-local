@@ -7,13 +7,14 @@ import { toast } from "sonner";
 
 import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components/chat/composer";
 import { ConversationMenu } from "@/components/chat/conversation-menu";
+import { DeletedConversation } from "@/components/chat/deleted-conversation";
 import { toTarget } from "@/components/chat/target-chip";
 import { groupBatches, Thread } from "@/components/chat/thread";
-import { WorkerBanner } from "@/components/chat/worker-banner";
+import { PollingLostBanner, WorkerBanner } from "@/components/chat/worker-banner";
 import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiFetch, errorMessage } from "@/lib/api-client";
+import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { ratioFromSize } from "@/lib/gpu/sizes";
 import { findImage } from "@/lib/jobs/find-image";
@@ -27,6 +28,11 @@ const QUEUED_POLL_MS = 3000;
 
 function scrollToBottom(): void {
   window.scrollTo({ top: document.documentElement.scrollHeight });
+}
+
+// 대화가 사라졌다(다른 탭에서 휴지통으로 갔거나 비워졌다)
+function isGone(error: unknown): boolean {
+  return error instanceof ApiClientError && error.status === 404;
 }
 
 export function ConversationView({ id, initialData }: { id: string; initialData: ConversationDetailDto }) {
@@ -56,7 +62,10 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     initialData,
     staleTime: 0,
     enabled: !deleting,
+    // 404 는 대화가 사라진 것이라 다시 묻지 않는다. 그 밖의 오류는 잠시 끊긴 것으로 보고 폴링을 이어 간다
+    retry: (count, error) => !isGone(error) && count < 3,
     refetchInterval: (q) => {
+      if (isGone(q.state.error)) return false;
       const jobs = q.state.data?.jobs ?? [];
       if (!jobs.some((j) => isActive(j.status))) return false;
       // 단계가 실제로 나아갈 때만 짧게 묻는다(대기나 0 step — GPU 가 깨는 동안 — 은 3초)
@@ -66,6 +75,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const detail = query.data;
   const model = detail.model as ModelId;
   const spec = getModel(model);
+  const gone = query.isError && isGone(query.error);
 
   // 고칠 이미지: 직접 고른 것(manualTarget) > 최신 요청의 첫 결과(자동 첨부). × 로 뺀 요청은 다시 붙이지 않는다
   // ?target= 은 처음 열 때뿐 아니라 같은 대화 안에서 바뀔 때(뷰어의 '이어서 고치기')도 반영한다(렌더 중 조정)
@@ -190,8 +200,14 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       <Topbar title={detail.title ?? "대화"} model={model} actions={<ConversationMenu id={id} title={detail.title} counts={detail.counts} onDeletingChange={setDeleting} />} />
       <ImageDeleteDialog image={imageToDelete} onOpenChange={(open) => !open && setImageToDelete(null)} onDeleted={handleDeleted} />
       <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-4 pb-6 sm:px-6">
-        {!detail.worker.reachable && <WorkerBanner />}
-        <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} onDelete={handleDeleteRequest} />
+        {gone ? (
+          <DeletedConversation />
+        ) : (
+          <>
+            {query.isError ? <PollingLostBanner /> : !detail.worker.reachable && <WorkerBanner />}
+            <Thread detail={detail} onEdit={handleEdit} onRegenerate={handleRegenerate} onCancel={handleCancel} onDelete={handleDeleteRequest} />
+          </>
+        )}
       </div>
       <div className="sticky bottom-0 mx-auto w-full max-w-205 bg-background px-4 pb-4 sm:px-6 sm:pb-6">
         {/* 모델 고정은 상단 자물쇠가, 고칠 이미지는 칩이 알려 준다. 고치기를 못 하는 이유만 여기서 알린다 */}

@@ -7,6 +7,7 @@ import { memo } from "react";
 import { toast } from "sonner";
 
 import { CompareSlider } from "@/components/chat/compare-slider";
+import { DeletedImage } from "@/components/chat/deleted-image";
 import { JobCard } from "@/components/chat/job-card";
 import { FLOAT_CLASS } from "@/components/chat/styles";
 import { FadeImage } from "@/components/fade-image";
@@ -71,10 +72,6 @@ function ImageTile({ image, model, onEdit, onDelete }: { image: ImageDto; model:
   );
 }
 
-function DeletedImage() {
-  return <div className="grid aspect-square place-items-center rounded-md border border-dashed text-caption text-muted-foreground">삭제한 이미지예요</div>;
-}
-
 type ResultCardProps = { jobs: JobDto[]; model: ModelId } & Handlers;
 
 // 폴링마다 대화가 다시 그려져도 잡 객체(캐시가 바뀌지 않은 잡은 그대로)·핸들러가 같으면 이 카드는 다시 그리지 않는다
@@ -112,7 +109,9 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
       : "대기 중"
     : isEdit
       ? `고친 결과${version ? `, 버전 ${version}` : ""}`
-      : `만든 이미지 ${images.length}장`;
+      : images.length === 0 && succeeded.length > 0
+        ? "삭제한 이미지"
+        : `만든 이미지 ${images.length}장`;
 
   async function copyPrompt() {
     try {
@@ -151,7 +150,13 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
       ) : (
         succeeded.length > 0 && (
           <div className={cn("grid gap-2", succeeded.length > 1 ? "grid-cols-2" : "max-w-md grid-cols-1")}>
-            {succeeded.map((j) => (j.image ? <ImageTile key={j.id} image={j.image} model={model} onEdit={onEdit} onDelete={onDelete} /> : <DeletedImage key={j.id} />))}
+            {succeeded.map((j) =>
+              j.image ? (
+                <ImageTile key={j.id} image={j.image} model={model} onEdit={onEdit} onDelete={onDelete} />
+              ) : (
+                <DeletedImage key={j.id} width={j.width} height={j.height} size="tile" />
+              ),
+            )}
           </div>
         )
       )}
@@ -162,6 +167,8 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
 
       {active.length === 0 && succeeded.length > 0 && (
         <div className="flex flex-wrap items-center gap-1">
+          {/* 고치기의 원본을 지웠으면 같은 요청을 다시 보낼 수 없다는 것을 버튼 대신 알린다 */}
+          {isEdit && !canRegenerate && <p className="px-2 text-caption text-muted-foreground">원본을 삭제해서 다시 고칠 수 없어요</p>}
           {regenerate && (
             <Button type="button" variant="ghost" size="sm" onClick={regenerate} className="max-md:h-11">
               <RefreshCwIcon aria-hidden="true" />

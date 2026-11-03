@@ -10,6 +10,7 @@ import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
 import { FadeImage } from "@/components/fade-image";
 import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { LoadError } from "@/components/ui/load-error";
 import { Spinner } from "@/components/ui/spinner";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
@@ -78,9 +79,11 @@ export function ImageViewerDialog() {
             <Spinner className="size-6" />
           </div>
         ) : image.isError ? (
-          <p className="grid min-h-64 place-items-center px-4 text-caption text-muted-foreground">
-            {image.error instanceof ApiClientError && image.error.status === 404 ? "이미지를 찾을 수 없어요" : "이미지를 불러오지 못했어요"}
-          </p>
+          image.error instanceof ApiClientError && image.error.status === 404 ? (
+            <p className="grid min-h-64 place-items-center px-4 text-caption text-muted-foreground">이미지를 찾을 수 없어요</p>
+          ) : (
+            <LoadError align="center" message="이미지를 불러오지 못했어요" onRetry={() => void image.refetch()} className="min-h-64" />
+          )
         ) : (
           <div className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             {/* 큰 이미지를 받는 동안 이미 받아 둔 썸네일을 같은 자리에 깔아 둔다(thumb-under) */}

@@ -18,6 +18,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api-client";
 import type { ConversationListDto } from "@/lib/jobs/schemas";
@@ -48,7 +49,7 @@ function ConversationList() {
   const list = useQuery({ queryKey: queryKeys.conversations.list(), queryFn: () => apiFetch<ConversationListDto>("/api/conversations") });
 
   if (list.isPending) return <ListSkeleton />;
-  if (list.isError) return <p className="px-2 text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
+  if (list.isError) return <LoadError message="목록을 불러오지 못했어요" onRetry={() => void list.refetch()} />;
   if (list.data.items.length === 0) return <p className="px-2 text-caption text-muted-foreground">아직 대화가 없어요</p>;
   return (
     <>

@@ -1,5 +1,6 @@
 "use client";
 
+import { DeletedImage } from "@/components/chat/deleted-image";
 import { ResultCard } from "@/components/chat/result-card";
 import { FadeImage } from "@/components/fade-image";
 import type { ModelId } from "@/lib/gpu/models";
@@ -28,7 +29,7 @@ function UserBubble({ job }: { job: JobDto }) {
             <figcaption className="absolute bottom-1 left-1 rounded-sm bg-overlay px-1.5 text-micro text-overlay-foreground">버전 {job.inputImage.version}</figcaption>
           </figure>
         ) : (
-          <div className="grid h-24 w-24 place-items-center rounded-md border border-dashed px-2 text-center text-micro text-muted-foreground">삭제한 이미지예요</div>
+          <DeletedImage width={96} height={96} size="ref" />
         ))}
       <p className="max-w-[80%] rounded-lg bg-secondary px-4 py-2.5 whitespace-pre-wrap">{job.prompt}</p>
     </div>
