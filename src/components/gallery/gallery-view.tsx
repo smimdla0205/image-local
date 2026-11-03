@@ -53,6 +53,8 @@ export function GalleryView() {
     },
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    // 창 포커스마다 받은 페이지를 전부 다시 받지 않는다(삭제·생성 같은 동작이 무효화한다)
+    refetchOnWindowFocus: false,
     // 검색·필터를 바꾸면 새 결과가 올 때까지 이전 결과를 흐리게 남긴다(자리표시로 깜빡이지 않게).
     // 이전 결과가 비어 있었으면 남기지 않는다(받기 전에 결과 없음을 보이지 않고 자리표시를 보인다)
     placeholderData: (previous) => (previous?.pages.some((p) => p.items.length > 0) ? previous : undefined),

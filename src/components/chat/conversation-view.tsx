@@ -35,6 +35,13 @@ function isGone(error: unknown): boolean {
   return error instanceof ApiClientError && error.status === 404;
 }
 
+function hasActiveJobs(detail: ConversationDetailDto | undefined): boolean {
+  return detail?.jobs.some((j) => isActive(j.status)) ?? false;
+}
+
+// 활성 잡이 없으면 서버가 그린 상세를 그대로 쓴다(마운트·창 포커스 때 다시 받지 않는다). 무효화나 사용자 동작이 있을 때만 새로 받는다
+const IDLE_STALE_MS = 60 * 1000;
+
 export function ConversationView({ id, initialData }: { id: string; initialData: ConversationDetailDto }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -60,7 +67,9 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       return { ...current, jobs, worker: synced.worker };
     },
     initialData,
-    staleTime: 0,
+    initialDataUpdatedAt: () => Date.now(),
+    staleTime: (q) => (hasActiveJobs(q.state.data) ? 0 : IDLE_STALE_MS),
+    refetchOnWindowFocus: (q) => hasActiveJobs(q.state.data),
     enabled: !deleting,
     // 404 는 대화가 사라진 것이라 다시 묻지 않는다. 그 밖의 오류는 잠시 끊긴 것으로 보고 폴링을 이어 간다
     retry: (count, error) => !isGone(error) && count < 3,

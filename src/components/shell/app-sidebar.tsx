@@ -48,7 +48,8 @@ function ListSkeleton() {
 function ConversationList() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
-  const list = useQuery({ queryKey: queryKeys.conversations.list(), queryFn: () => apiFetch<ConversationListDto>("/api/conversations") });
+  // 목록은 잡 완료·제출·삭제가 무효화한다. 창 포커스마다 다시 받지 않는다
+  const list = useQuery({ queryKey: queryKeys.conversations.list(), queryFn: () => apiFetch<ConversationListDto>("/api/conversations"), refetchOnWindowFocus: false });
 
   if (list.isPending) return <ListSkeleton />;
   if (list.isError) return <LoadError message="목록을 불러오지 못했어요" onRetry={() => void list.refetch()} />;
