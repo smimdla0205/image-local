@@ -50,7 +50,15 @@ function ConversationList() {
 
   if (list.isPending) return <ListSkeleton />;
   if (list.isError) return <LoadError message="목록을 불러오지 못했어요" onRetry={() => void list.refetch()} />;
-  if (list.data.items.length === 0) return <p className="px-2 text-caption text-muted-foreground">아직 대화가 없어요</p>;
+  if (list.data.items.length === 0)
+    return (
+      <div className="flex flex-col gap-1 px-2 text-caption">
+        <p className="text-muted-foreground">아직 대화가 없어요</p>
+        <Link href="/" onClick={() => setOpenMobile(false)} className="self-start rounded-sm text-label underline underline-offset-4 outline-none focus-visible:shadow-focus-ring">
+          새 대화
+        </Link>
+      </div>
+    );
   return (
     <>
       {groupByDay(list.data.items, new Date()).map((group) => (

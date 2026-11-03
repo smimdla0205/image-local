@@ -2,6 +2,8 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { cn } from "cn";
+import { ImagesIcon } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -10,7 +12,8 @@ import { GalleryGrid } from "@/components/gallery/gallery-grid";
 import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { groupByDate } from "@/components/shell/day-groups";
 import { Topbar } from "@/components/shell/topbar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -76,7 +79,29 @@ export function GalleryView() {
   if (images.isPending) content = <GridSkeleton />;
   // 받은 목록이 있으면(다음 페이지만 실패) 격자를 남기고 '더 보기' 옆에서 알린다
   else if (images.isError && !images.data) content = <LoadError align="center" message="목록을 불러오지 못했어요" onRetry={() => void images.refetch()} />;
-  else if (items.length === 0) content = <p className="py-16 text-center text-caption text-muted-foreground">{filtered ? "찾는 이미지가 없어요" : "아직 만든 이미지가 없어요"}</p>;
+  else if (items.length === 0)
+    content = (
+      <Empty className="border py-10">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ImagesIcon aria-hidden="true" />
+          </EmptyMedia>
+          <EmptyTitle>{filtered ? "찾는 이미지가 없어요" : "아직 만든 이미지가 없어요"}</EmptyTitle>
+          <EmptyDescription>{filtered ? "검색어나 모델 필터를 바꿔 보세요" : "새 대화에서 첫 이미지를 만들어 보세요"}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          {filtered ? (
+            <Button type="button" variant="outline" onClick={() => router.replace(pathname, { scroll: false })} className="max-md:h-11">
+              필터 지우기
+            </Button>
+          ) : (
+            <Link href="/" className={buttonVariants({ variant: "default" })}>
+              새 대화
+            </Link>
+          )}
+        </EmptyContent>
+      </Empty>
+    );
   else
     content = (
       <div aria-busy={images.isPlaceholderData} className={cn("flex flex-col gap-6 motion-safe:transition-opacity", images.isPlaceholderData && "opacity-60")}>
