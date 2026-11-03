@@ -55,6 +55,8 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
       if (claimed.count === 0) throw new JobNoLongerActive();
       // 고친 원본이 그 사이 지워졌을 수 있어 부모는 지금 기준으로 다시 확인한다(버전 번호는 원본 기준 그대로)
       const parent = job.inputImageId ? await tx.image.findUnique({ where: { id: job.inputImageId }, select: { id: true } }) : null;
+      // 대화가 그 사이 휴지통에 갔으면 결과도 같은 시각으로 휴지통에 둔다(복구하면 같이 돌아온다)
+      const conversation = await tx.conversation.findUnique({ where: { id: job.conversationId }, select: { deletedAt: true } });
       await tx.image.create({
         data: {
           id: imageId,
@@ -71,6 +73,7 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
           bytes: png.length,
           version: job.inputImage ? job.inputImage.version + 1 : 1,
           parentId: parent?.id ?? null,
+          deletedAt: conversation?.deletedAt ?? null,
         },
       });
       await tx.conversation.update({ where: { id: job.conversationId }, data: { updatedAt: new Date() } });

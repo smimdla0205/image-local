@@ -29,9 +29,12 @@ model Conversation {
   images    Image[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // 휴지통으로 옮긴 시각. null 이면 보통 대화. 30일 뒤 행·파일을 지운다(src/lib/jobs/trash.ts)
+  deletedAt DateTime?
 
   @@index([userId, updatedAt])
   @@index([updatedAt])
+  @@index([deletedAt])
 }
 
 // 이미지 생성 요청 하나(잡 1개 = 이미지 1장). 앱이 GPU 워커를 폴링해 status·step·결과를 채운다
@@ -94,11 +97,14 @@ model Image {
   children       Image[]       @relation("ImageVersions")
   inputFor       Job[]         @relation("JobInput")
   createdAt      DateTime      @default(now())
+  // 휴지통으로 옮긴 시각. 대화와 함께 옮기면 대화의 deletedAt 과 같은 값이라 대화를 복구할 때 같이 돌아온다
+  deletedAt      DateTime?
 
   @@index([kind, createdAt])
   @@index([model, createdAt])
   @@index([conversationId])
   @@index([parentId])
+  @@index([deletedAt])
 }
 
 enum JobStatus {

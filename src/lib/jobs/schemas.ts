@@ -42,6 +42,13 @@ export const imageListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
 });
 
+// DELETE /api/trash 본문. 비어 있으면 전부, id 를 주면 그것만, before 는 그 시각보다 먼저 휴지통에 들어간 것만
+export const purgeBodySchema = z.object({
+  conversationIds: z.array(z.string().regex(ID_RE)).max(100).optional(),
+  imageIds: z.array(z.string().regex(ID_RE)).max(100).optional(),
+  before: z.iso.datetime().optional(),
+});
+
 // 대화 상세에 싣는 최근 잡 수(그보다 오래된 잡은 화면에 오르지 않는다). 진행 중 잡 GET 이 한 번에 물을 수 있는 수도 같다
 export const DETAIL_JOB_LIMIT = 100;
 // GET /api/conversations/[id]/jobs?ids=a,b — 물을 잡 id 를 쉼표로 잇는다
@@ -74,6 +81,8 @@ export type ImageDto = {
   thumbUrl: string;
   previewUrl: string;
   createdAt: string;
+  // 휴지통에 있으면 옮긴 시각. 보통 목록·상세에는 null 만 온다
+  deletedAt: string | null;
 };
 
 export type JobDto = {
@@ -97,8 +106,14 @@ export type JobDto = {
   createdAt: string;
 };
 
-export type ConversationDto = { id: string; title: string | null; model: ModelId; thumbUrl: string | null; createdAt: string; updatedAt: string };
+export type ConversationDto = { id: string; title: string | null; model: ModelId; thumbUrl: string | null; createdAt: string; updatedAt: string; deletedAt: string | null };
 export type WorkerState = { reachable: boolean };
+// 휴지통 목록. expiresAt 은 자동으로 지워지는 시각(deletedAt + 30일)
+export type TrashConversationDto = ConversationDto & { deletedAt: string; expiresAt: string; imageCount: number };
+export type TrashImageDto = ImageDto & { deletedAt: string; expiresAt: string };
+export type TrashDto = { conversations: TrashConversationDto[]; images: TrashImageDto[] };
+// GET /api/images/[id]/refs — 이 이미지를 원본으로 둔 고친 버전 수, 입력으로 쓴 요청 수
+export type ImageRefsDto = { children: number; inputFor: number };
 export type ConversationDetailDto = ConversationDto & { jobs: JobDto[]; worker: WorkerState };
 export type ConversationListDto = { items: ConversationDto[] };
 // 잡 묶음 응답: POST /api/conversations/[id]/jobs(만든 잡), GET 같은 경로(물은 진행 중 잡을 워커와 맞춘 것)

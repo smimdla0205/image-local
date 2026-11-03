@@ -37,7 +37,13 @@ export function toImageDto(i: Image): ImageDto {
     parentId: i.parentId,
     ...imageUrls(i.id),
     createdAt: i.createdAt.toISOString(),
+    deletedAt: i.deletedAt?.toISOString() ?? null,
   };
+}
+
+// 휴지통 이미지는 화면에서 없는 것으로 다룬다(행은 남아 복구할 수 있다)
+function liveImage(i: Image | null): ImageDto | null {
+  return i && !i.deletedAt ? toImageDto(i) : null;
 }
 
 export function toJobDto(j: JobWithImages): JobDto {
@@ -57,15 +63,16 @@ export function toJobDto(j: JobWithImages): JobDto {
     step: j.step,
     queuePosition: j.queuePosition,
     error: j.error,
-    inputImage: j.inputImage ? toImageDto(j.inputImage) : null,
-    image: j.image ? toImageDto(j.image) : null,
+    inputImage: liveImage(j.inputImage),
+    image: liveImage(j.image),
     createdAt: j.createdAt.toISOString(),
   };
 }
 
+// 휴지통 대화는 없는 것으로 다룬다(404)
 export async function getConversationDetail(id: string): Promise<{ conversation: Conversation; jobs: JobWithImages[] } | null> {
   const conversation = await prisma.conversation.findUnique({ where: { id } });
-  if (!conversation) return null;
+  if (!conversation || conversation.deletedAt) return null;
   // 최신 DETAIL_JOB_LIMIT 개를 가져와 오래된 순으로 돌려준다
   const recent = await prisma.job.findMany({
     where: { conversationId: id },
@@ -83,7 +90,7 @@ export async function reloadJobs(jobs: JobWithImages[], ids: Iterable<string>): 
   return jobs.map((j) => byId.get(j.id) ?? j);
 }
 
-function toConversationDto(c: Conversation, thumbImageId: string | null): ConversationDto {
+export function toConversationDto(c: Conversation, thumbImageId: string | null): ConversationDto {
   return {
     id: c.id,
     title: c.title,
@@ -91,20 +98,22 @@ function toConversationDto(c: Conversation, thumbImageId: string | null): Conver
     thumbUrl: thumbImageId ? imageUrls(thumbImageId).thumbUrl : null,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
+    deletedAt: c.deletedAt?.toISOString() ?? null,
   };
 }
 
 export function toConversationDetailDto(c: Conversation, jobs: JobWithImages[], worker: WorkerState): ConversationDetailDto {
-  const latestImage = [...jobs].reverse().find((j) => j.image)?.image ?? null;
+  const latestImage = [...jobs].reverse().find((j) => j.image && !j.image.deletedAt)?.image ?? null;
   return { ...toConversationDto(c, latestImage?.id ?? null), jobs: jobs.map(toJobDto), worker };
 }
 
 export async function listConversations(limit: number): Promise<ConversationDto[]> {
-  // 썸네일은 대화마다 최신 생성·고침 이미지 하나(관계 include 로 한 번에 가져온다)
+  // 썸네일은 대화마다 최신 생성·고침 이미지 하나(관계 include 로 한 번에 가져온다). 휴지통 대화·이미지는 뺀다
   const rows = await prisma.conversation.findMany({
+    where: { deletedAt: null },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     take: limit,
-    include: { images: { where: { kind: { not: "UPLOADED" } }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true } } },
+    include: { images: { where: { kind: { not: "UPLOADED" }, deletedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true } } },
   });
   return rows.map((r) => toConversationDto(r, r.images[0]?.id ?? null));
 }

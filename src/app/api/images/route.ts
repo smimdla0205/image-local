@@ -8,7 +8,7 @@ export const GET = handleRoute("images.list", async (req) => {
   const { cursor, limit, model, q } = imageListQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
   // 다음 페이지가 있는지 알려고 하나 더 가져온다
   const rows = await prisma.image.findMany({
-    where: { kind: { in: ["GENERATED", "EDITED"] }, ...(model ? { model } : {}), ...(q ? { prompt: { contains: q } } : {}) },
+    where: { kind: { in: ["GENERATED", "EDITED"] }, deletedAt: null, ...(model ? { model } : {}), ...(q ? { prompt: { contains: q } } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

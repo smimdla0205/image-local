@@ -1,23 +1,20 @@
 import { ApiError, handleRoute } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { toImageDto } from "@/lib/jobs/queries";
-import { deleteImageFiles } from "@/lib/storage";
+import { trashImage } from "@/lib/jobs/trash";
 
-// GET /api/images/[id] — 이미지 하나(뷰어)
+// GET /api/images/[id] — 이미지 하나(뷰어). 휴지통 이미지는 404
 export const GET = handleRoute("images.get", async (_req, ctx) => {
   const { id } = await ctx.params;
   const image = await prisma.image.findUnique({ where: { id } });
-  if (!image) throw new ApiError(404, "image_not_found");
+  if (!image || image.deletedAt) throw new ApiError(404, "image_not_found");
   return Response.json(toImageDto(image));
 });
 
-// DELETE /api/images/[id] — 확인 뒤 바로 영구 삭제. 이 이미지로 고친 버전은 남고 parentId·입력 이미지만 비워진다(SetNull)
+// DELETE /api/images/[id] — 휴지통으로 옮긴다. 행이 남으므로 고친 버전의 parentId·요청의 입력 이미지는 그대로이고 응답에서만 비워진다
 export const DELETE = handleRoute("images.delete", async (_req, ctx) => {
   const { id } = await ctx.params;
-  const image = await prisma.image.findUnique({ where: { id }, select: { id: true } });
-  if (!image) throw new ApiError(404, "image_not_found");
-  // 행을 먼저 지우고 파일은 그다음(파일 삭제가 실패해도 깨진 행이 남지 않는다)
-  await prisma.image.delete({ where: { id } });
-  await deleteImageFiles(id);
-  return Response.json({ id });
+  const trashed = await trashImage(id);
+  if (!trashed) throw new ApiError(404, "image_not_found");
+  return Response.json({ id: trashed.id, deletedAt: trashed.deletedAt.toISOString() });
 });

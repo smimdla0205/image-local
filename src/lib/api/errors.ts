@@ -13,6 +13,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   transparent_not_supported: "이 모델은 투명 배경을 지원하지 않아요.",
   input_image_not_found: "고칠 이미지를 찾을 수 없어요.",
   conversation_not_found: "찾을 수 없어요.",
+  conversation_in_trash: "대화가 휴지통에 있어요. 대화를 먼저 복구해 주세요.",
   job_not_found: "찾을 수 없어요.",
   image_not_found: "찾을 수 없어요.",
   not_found: "찾을 수 없어요.",

@@ -37,7 +37,8 @@ export async function createJobs(tx: Prisma.TransactionClient, conversation: { i
   if (input.inputImageId) {
     if (!spec.canEdit) throw new ApiError(400, "model_cannot_edit");
     inputImage = await tx.image.findUnique({ where: { id: input.inputImageId } });
-    if (!inputImage) throw new ApiError(400, "input_image_not_found");
+    // 휴지통 이미지는 없는 것으로 본다(복구하면 다시 쓸 수 있다)
+    if (!inputImage || inputImage.deletedAt) throw new ApiError(400, "input_image_not_found");
   }
   if (input.transparent && !spec.supportsTransparent) throw new ApiError(400, "transparent_not_supported");
 

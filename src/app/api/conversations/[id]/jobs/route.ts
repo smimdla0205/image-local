@@ -25,7 +25,7 @@ export const POST = handleRoute("jobs.create", async (req, ctx) => {
   const body = await parseJsonBody(req, createJobsBodySchema);
   const jobs = await prisma.$transaction(async (tx) => {
     const conversation = await tx.conversation.findUnique({ where: { id } });
-    if (!conversation) throw new ApiError(404, "conversation_not_found");
+    if (!conversation || conversation.deletedAt) throw new ApiError(404, "conversation_not_found");
     // 사이드바가 최근 대화를 위로 올리도록 updatedAt 을 갱신한다
     await tx.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
     return createJobs(tx, conversation, body);
