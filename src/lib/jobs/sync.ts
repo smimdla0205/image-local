@@ -88,8 +88,7 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
   }
 }
 
-// 활성 잡을 워커와 맞춘다. 제출된 잡의 워커 상태는 한꺼번에 요청하고, 반영은 잡 순서대로 하나씩 한다.
-// 한 잡의 오류가 응답 전체를 500 으로 만들지 않도록 잡마다 따로 처리한다.
+// 활성 잡을 워커와 맞춘다. 제출된 잡의 워커 상태는 한꺼번에 요청하고, 반영도 함께 한다.
 // 워커를 쓸 수 없으면 남은 잡은 건너뛰고 reachable=false(DB 는 그대로, 다음 폴링이 이어 간다)
 export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithImages[]; worker: WorkerState }> {
   const active = jobs.filter((j) => isActive(j.status));
@@ -99,48 +98,58 @@ export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithIm
   const touched = new Set<string>();
   const inputIds = new Map<string, string>();
 
-  // 제출된 잡의 워커 상태 요청을 한꺼번에 보낸다(미제출은 null). 모두 끝난 뒤 순서대로 반영하므로 중간에 멈춰도 처리되지 않은 거부가 남지 않는다
+  // 제출된 잡의 워커 상태 요청을 한꺼번에 보낸다(미제출은 null). 모두 끝난 뒤 반영하므로 처리되지 않은 거부가 남지 않는다
   const requests = active.map((job) => ({ job, status: job.submittedAt ? client.getJob(job.id) : null }));
   await Promise.allSettled(requests.map((r) => r.status));
 
+  // 아직 안 보낸 잡은 차례로 보낸다(같은 입력 이미지를 한 번만 올리도록). 응답 뒤 제출(after)이 보내는 중인 잡은 submitToWorker 가 건너뛴다
   for (const { job, status } of requests) {
+    if (status) continue;
+    touched.add(job.id);
     try {
-      if (!status) {
-        // 생성할 때 워커가 없었던 잡은 이제 보낸다
-        touched.add(job.id);
-        if ((await submitToWorker(job, inputIds)) === "unavailable") {
-          reachable = false;
-          break;
-        }
-        continue;
-      }
-      const ws = await status;
-      const { patch, fetchOutput } = applyWorkerStatus({ status: job.status, step: job.step, hasImage: job.image !== null }, ws);
-      if (fetchOutput) {
-        touched.add(job.id);
-        await saveOutput(job, patch);
-      } else if (changesRow(job, patch)) {
-        touched.add(job.id);
-        await patchIfActive(job.id, patch);
-      }
-    } catch (e) {
-      if (isWorkerUnavailable(e)) {
+      if ((await submitToWorker(job, inputIds)) === "unavailable") {
         reachable = false;
         break;
       }
-      // 워커는 끝났다는데 결과가 아직 안 보이면(409 not_ready, Modal Volume 반영 지연) 잡을 그대로 두고 다음 폴링에 다시 받는다
-      if (e instanceof WorkerError && e.kind === "http" && e.status === 409) continue;
-      touched.add(job.id);
-      if (e instanceof WorkerError && e.kind === "http" && e.status === 404) {
-        await patchIfActive(job.id, { status: "FAILED", error: WORKER_LOST_MESSAGE });
-      } else if (e instanceof WorkerError) {
-        await patchIfActive(job.id, { status: "FAILED", error: e.workerMessage ?? ERROR_MESSAGES.internal_error });
-      } else {
-        // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다. 잡 id 와 오류 종류만 남긴다
-        console.error("[sync]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
-      }
+    } catch (e) {
+      // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다. 잡 id 와 오류 종류만 남긴다
+      console.error("[sync]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
     }
   }
+
+  // 보낸 잡의 상태는 함께 반영한다(결과 저장이 서로 기다리지 않는다). 잡마다 따로 처리해 한 잡의 오류가 응답 전체를 500 으로 만들지 않는다
+  await Promise.all(
+    requests.map(async ({ job, status }) => {
+      if (!status) return;
+      try {
+        const ws = await status;
+        const { patch, fetchOutput } = applyWorkerStatus({ status: job.status, step: job.step, hasImage: job.image !== null }, ws);
+        if (fetchOutput) {
+          touched.add(job.id);
+          await saveOutput(job, patch);
+        } else if (changesRow(job, patch)) {
+          touched.add(job.id);
+          await patchIfActive(job.id, patch);
+        }
+      } catch (e) {
+        if (isWorkerUnavailable(e)) {
+          reachable = false;
+          return;
+        }
+        // 워커는 끝났다는데 결과가 아직 안 보이면(409 not_ready, Modal Volume 반영 지연) 잡을 그대로 두고 다음 폴링에 다시 받는다
+        if (e instanceof WorkerError && e.kind === "http" && e.status === 409) return;
+        touched.add(job.id);
+        if (e instanceof WorkerError && e.kind === "http" && e.status === 404) {
+          await patchIfActive(job.id, { status: "FAILED", error: WORKER_LOST_MESSAGE });
+        } else if (e instanceof WorkerError) {
+          await patchIfActive(job.id, { status: "FAILED", error: e.workerMessage ?? ERROR_MESSAGES.internal_error });
+        } else {
+          // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다. 잡 id 와 오류 종류만 남긴다
+          console.error("[sync]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
+        }
+      }
+    }),
+  );
 
   if (touched.size === 0) return { jobs, worker: { reachable } };
   return { jobs: await reloadJobs(jobs, touched), worker: { reachable } };

@@ -141,13 +141,15 @@ class MockBackend:
     프롬프트 접두어로 실패를 흉내 낸다: "[fail]" 은 마지막 step 뒤 failed, "[lost]" 는 레코드를 지운다(이후 404),
     "[slow-output]" 은 끝난 뒤 결과를 두 번 '아직 없음'으로 낸다(Modal Volume 반영이 늦는 경우).
     "[stall]" 은 running·0 step 에 머물다 취소되면 cancelled(GPU 가 늦게 깨는 경우).
+    "[slow-submit]" 은 접수(submit)에 slow_submit 초가 걸린다(앱이 접수를 응답 뒤로 미루는지 보는 데 쓴다).
     """
 
     name = "mock"
 
-    def __init__(self, store: JobStore | None = None, step_interval: float = 0.2) -> None:
+    def __init__(self, store: JobStore | None = None, step_interval: float = 0.2, slow_submit: float = 1.5) -> None:
         self.store = store if store is not None else MemoryStore()
         self.step_interval = step_interval
+        self.slow_submit = slow_submit
         self._inputs: set[str] = set()
         self._outputs: dict[str, bytes] = {}
         self._output_misses: dict[str, int] = {}
@@ -175,6 +177,8 @@ class MockBackend:
         return InputResponse(input_id=input_id, width=img.width, height=img.height)
 
     def submit(self, job: JobRequest) -> tuple[JobStatusResponse, bool]:
+        if job.prompt.startswith("[slow-submit]"):
+            time.sleep(self.slow_submit)
         # 같은 id 가 동시에 두 번 와도 잡은 하나만 만든다(확인과 저장을 한 잠금 안에서)
         with self._lock:
             existing = self.store.get(job.id)

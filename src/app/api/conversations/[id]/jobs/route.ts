@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 import { ApiError, handleRoute, parseJsonBody } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { createJobs, submitJobs } from "@/lib/jobs/create";
@@ -30,6 +32,7 @@ export const POST = handleRoute("jobs.create", async (req, ctx) => {
     await tx.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
     return createJobs(tx, conversation, body);
   });
-  const submitted = await submitJobs(jobs);
-  return Response.json({ jobs: submitted.jobs.map(toJobDto), worker: submitted.worker }, { status: 201 });
+  // 워커 접수는 응답 뒤에 한다. 워커 상태는 다음 동기화(폴링)가 알린다
+  after(() => submitJobs(jobs));
+  return Response.json({ jobs: jobs.map(toJobDto), worker: { reachable: true } }, { status: 201 });
 });

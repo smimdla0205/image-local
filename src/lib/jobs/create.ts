@@ -10,12 +10,15 @@ import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/cli
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { fitToMegapixel, SIZE_BY_RATIO } from "@/lib/gpu/sizes";
 import { ACTIVE_WINDOW_MS, assertCapacity } from "@/lib/jobs/capacity";
-import { jobInclude, type JobWithImages, reloadJobs } from "@/lib/jobs/queries";
-import { type createJobsBodySchema, SEED_MAX, type WorkerState } from "@/lib/jobs/schemas";
+import { jobInclude, type JobWithImages } from "@/lib/jobs/queries";
+import { type createJobsBodySchema, SEED_MAX } from "@/lib/jobs/schemas";
 import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
 import { readFileIfExists, storageKey } from "@/lib/storage";
 
 export type CreateJobsInput = z.output<typeof createJobsBodySchema>;
+
+// 지금 워커에 보내는 중인 잡 id(한 프로세스 안). 응답 뒤 제출과 그 사이 들어온 폴링 동기화가 같은 잡을 두 번 보내지 않게 한다
+const submitting = new Set<string>();
 
 const TITLE_MAX = 40;
 
@@ -86,6 +89,9 @@ async function markFailed(jobId: string, error: string): Promise<void> {
 // 잡 자체의 문제(워커 4xx·입력 이미지 없음)는 그 잡을 FAILED 로 바꾸고 'submitted'.
 // inputIds: 같은 배치에서 같은 입력 이미지를 한 번만 올리도록 이미지 id → 워커 input_id 를 기억한다
 export async function submitToWorker(job: JobWithImages, inputIds: Map<string, string> = new Map()): Promise<"submitted" | "unavailable"> {
+  // 다른 요청이 이 잡을 보내는 중이면 건너뛴다(그쪽이 제출 시각을 남기거나 실패로 바꾼다)
+  if (submitting.has(job.id)) return "submitted";
+  submitting.add(job.id);
   const client = getWorkerClient();
   try {
     let inputId: string | null = null;
@@ -131,13 +137,14 @@ export async function submitToWorker(job: JobWithImages, inputIds: Map<string, s
       return "submitted";
     }
     throw e;
+  } finally {
+    submitting.delete(job.id);
   }
 }
 
-// 트랜잭션이 끝난 뒤 잡을 차례로 워커에 보낸다. 하나라도 워커를 못 쓰면 나머지는 다음 동기화에 맡긴다.
-// 대화·잡은 이미 만들어졌으므로 디스크·DB 같은 로컬 오류도 500 으로 끝내지 않고 남은 잡을 다음 동기화에 맡긴다
-export async function submitJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithImages[]; worker: WorkerState }> {
-  let reachable = true;
+// 응답을 보낸 뒤(after) 잡을 차례로 워커에 보낸다(응답이 워커 접수·입력 업로드를 기다리지 않는다).
+// 하나라도 워커를 못 쓰면 나머지는 다음 동기화에 맡긴다. 디스크·DB 같은 로컬 오류도 던지지 않고 남은 잡을 다음 동기화에 맡긴다
+export async function submitJobs(jobs: JobWithImages[]): Promise<void> {
   const inputIds = new Map<string, string>();
   for (const job of jobs) {
     let result: "submitted" | "unavailable";
@@ -148,10 +155,6 @@ export async function submitJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWith
       console.error("[submit]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
       break;
     }
-    if (result === "unavailable") {
-      reachable = false;
-      break;
-    }
+    if (result === "unavailable") break;
   }
-  return { jobs: await reloadJobs(jobs, jobs.map((j) => j.id)), worker: { reachable } };
 }
