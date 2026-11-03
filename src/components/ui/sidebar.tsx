@@ -60,8 +60,28 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
-// html[data-sidebar] 는 토글할 때 이 컴포넌트가 직접 지우고 다시 그리므로 따로 구독할 것이 없다
-const subscribeNoop = () => () => {}
+// 쿠키 복원값(html[data-sidebar], sidebar_width 쿠키)을 외부 스토어로 읽는다. 지우거나 바꾼 쪽이 notify 로 다시 읽게 한다
+const restoreListeners = new Set<() => void>()
+const subscribeRestore = (listener: () => void) => {
+  restoreListeners.add(listener)
+  return () => {
+    restoreListeners.delete(listener)
+  }
+}
+function clearRestoredCollapsed() {
+  if (document.documentElement.dataset.sidebar === undefined) return
+  delete document.documentElement.dataset.sidebar
+  for (const listener of restoreListeners) listener()
+}
+
+// 접기 뒤 포커스를 받을 열기 버튼(Topbar). 접기 버튼은 inert 가 되어 포커스를 잃는다
+const OPEN_TRIGGER_SELECTOR = "[data-sidebar-open-trigger]"
+function focusOpenTrigger() {
+  const active = document.activeElement
+  // 입력창 같은 다른 곳에 포커스가 있으면(Ctrl+B) 그대로 둔다
+  if (active && active !== document.body && !active.closest("[data-slot=sidebar-container]")) return
+  document.querySelector<HTMLElement>(OPEN_TRIGGER_SELECTOR)?.focus()
+}
 
 function useSidebar() {
   const context = React.useContext(SidebarContext)
@@ -94,7 +114,7 @@ function SidebarProvider({
   // 쿠키로 접어 둔 첫 페인트(layout.tsx 의 인라인 스크립트가 html[data-sidebar] 에 올린다). 서버 HTML 은 펼침이라
   // 외부 스냅숏으로 읽어 hydration 뒤에만 반영한다. 사용자가 토글하면 속성을 지워 상태만 따른다
   const restoredCollapsed = React.useSyncExternalStore(
-    subscribeNoop,
+    subscribeRestore,
     () => document.documentElement.dataset.sidebar === "collapsed",
     () => false
   )
@@ -102,7 +122,7 @@ function SidebarProvider({
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value
-      delete document.documentElement.dataset.sidebar
+      clearRestoredCollapsed()
       if (setOpenProp) {
         setOpenProp(openState)
       } else {
@@ -111,13 +131,20 @@ function SidebarProvider({
 
       // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      // 접으면 다음 그리기 뒤(열기 버튼이 생긴 뒤) 포커스를 옮긴다
+      if (!openState) requestAnimationFrame(focusOpenTrigger)
     },
     [setOpenProp, open]
   )
 
+  // 모바일(시트)에서는 쿠키 복원 접힘이 뜻이 없다. 남겨 두면 창을 넓혔을 때 숨은 상태가 된다
+  React.useEffect(() => {
+    if (isMobile) clearRestoredCollapsed()
+  }, [isMobile])
+
   // 너비. 첫 페인트는 인라인 스크립트가 쿠키로 html 의 --sidebar-width-user 에 올린다. 상태는 aria 값과 저장에 쓴다
   const restoredWidth = React.useSyncExternalStore(
-    subscribeNoop,
+    subscribeRestore,
     () => readSidebarWidthCookie(document.cookie),
     () => SIDEBAR_WIDTH_DEFAULT
   )
@@ -323,6 +350,8 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
+      {/* aria-label 을 준 호출자가 대부분이지만, 없을 때의 이름 */}
+      {props["aria-label"] === undefined && <span className="sr-only">사이드바 열기·접기</span>}
     </Button>
   )
 }
@@ -330,9 +359,13 @@ function SidebarTrigger({
 // 사이드바 오른쪽 가장자리의 너비 조절 핸들. 드래그·방향키(1rem)·Home/End·더블클릭(기본값). 보이는 선은 hover·포커스·드래그 중에만 signal
 function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div">) {
   const { width, setWidth, resizing, setResizing, isMobile, state } = useSidebar()
+  // 진행 중인 드래그를 끝내는 함수. 핸들이 사라질 때(접기·모바일 전환) 정리한다
+  const stopDrag = React.useRef<(() => void) | null>(null)
+  React.useEffect(() => () => stopDrag.current?.(), [])
   if (isMobile || state === "collapsed") return null
 
-  const toRem = (clientX: number) => clampSidebarWidth(clientX / REM_PX)
+  // 사이드바는 왼쪽 가장자리(x=0)에 붙어 있어 포인터의 x 가 곧 너비다. rem 은 실제 루트 글자 크기로 환산한다
+  const toRem = (clientX: number) => clampSidebarWidth(clientX / (parseFloat(getComputedStyle(document.documentElement).fontSize) || REM_PX))
 
   // 드래그는 window 에서 듣는다(핸들이 폭을 따라 움직여도 끊기지 않게). 놓으면 그때 저장한다.
   // 기본 동작(글자 선택·드래그 시작)은 막고 포커스는 직접 준다(누른 뒤 방향키를 쓸 수 있게). 움직이지 않은 클릭은 너비를 바꾸지 않는다
@@ -340,6 +373,7 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
     if (e.button !== 0) return
     e.preventDefault()
     e.currentTarget.focus()
+    stopDrag.current?.()
     setResizing(true)
     let last: number | null = null
     const move = (ev: PointerEvent) => {
@@ -347,16 +381,21 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
       setWidth(toRem(last), false)
     }
     const stop = () => {
+      stopDrag.current = null
       window.removeEventListener("pointermove", move)
       window.removeEventListener("pointerup", stop)
       window.removeEventListener("pointercancel", stop)
+      window.removeEventListener("blur", stop)
       setResizing(false)
       // 마지막으로 끈 자리를 저장한다(cancel 이벤트의 좌표는 0 이라 쓰지 않는다)
       if (last !== null) setWidth(toRem(last))
     }
+    stopDrag.current = stop
     window.addEventListener("pointermove", move)
     window.addEventListener("pointerup", stop)
     window.addEventListener("pointercancel", stop)
+    // 창 밖에서 놓아 pointerup 을 못 받으면 창이 포커스를 잃을 때 끝낸다
+    window.addEventListener("blur", stop)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
