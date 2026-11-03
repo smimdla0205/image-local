@@ -90,7 +90,7 @@ export function ImageViewerDialog() {
           <div className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             {/* 큰 이미지를 받는 동안 이미 받아 둔 썸네일을 같은 자리에 깔아 둔다(thumb-under) */}
             <div
-              className="thumb-under self-start rounded-md bg-muted bg-contain bg-center bg-no-repeat"
+              className="thumb-under self-start rounded-md bg-contain bg-center bg-no-repeat"
               style={{ "--thumb": `url(${JSON.stringify(image.data.thumbUrl)})` } as CSSProperties}
             >
               <FadeImage

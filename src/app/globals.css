@@ -217,8 +217,10 @@ img[data-loading] {
 .image-frame-together:has(img[data-loading]) img {
   opacity: 0;
 }
-/* 뷰어: 큰 이미지를 받는 동안만 같은 자리에 썸네일(--thumb)을 깔아 둔다(다 받으면 걷어 내 투명 배경 뒤로 비치지 않게) */
+/* 뷰어: 큰 이미지를 받는 동안만 같은 자리에 썸네일(--thumb)과 자리 바탕(muted)을 깔아 둔다.
+   다 받으면 걷어 내 투명 배경 뒤로 비치거나 이미지 옆(object-contain 여백)에 회색 띠가 남지 않게 한다 */
 .thumb-under:has(img[data-loading]) {
+  background-color: var(--muted);
   background-image: var(--thumb);
 }
 @keyframes image-loading {
