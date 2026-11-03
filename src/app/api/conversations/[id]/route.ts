@@ -1,7 +1,9 @@
+import { after } from "next/server";
+
 import { ApiError, handleRoute } from "@/lib/api/errors";
 import { getConversationDetail, toConversationDetailDto } from "@/lib/jobs/queries";
 import { syncJobs } from "@/lib/jobs/sync";
-import { trashConversation } from "@/lib/jobs/trash";
+import { collectGarbage, trashConversation } from "@/lib/jobs/trash";
 
 // GET /api/conversations/[id] — 대화와 잡(최근 100개). 응답 전에 진행 중인 잡을 워커와 맞춘다(폴링). 휴지통 대화는 404
 export const GET = handleRoute("conversations.get", async (_req, ctx) => {
@@ -17,5 +19,7 @@ export const DELETE = handleRoute("conversations.delete", async (_req, ctx) => {
   const { id } = await ctx.params;
   const trashed = await trashConversation(id);
   if (!trashed) throw new ApiError(404, "conversation_not_found");
+  // 30일 지난 항목·오래된 업로드 정리는 응답을 보낸 뒤에
+  after(collectGarbage);
   return Response.json({ id: trashed.id, deletedAt: trashed.deletedAt.toISOString() });
 });

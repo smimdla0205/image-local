@@ -111,7 +111,8 @@ export type WorkerState = { reachable: boolean };
 // 휴지통 목록. expiresAt 은 자동으로 지워지는 시각(deletedAt + 30일)
 export type TrashConversationDto = ConversationDto & { deletedAt: string; expiresAt: string; imageCount: number };
 export type TrashImageDto = ImageDto & { deletedAt: string; expiresAt: string };
-export type TrashDto = { conversations: TrashConversationDto[]; images: TrashImageDto[] };
+// total 은 목록 상한(200)과 무관한 전체 수
+export type TrashDto = { conversations: TrashConversationDto[]; images: TrashImageDto[]; total: { conversations: number; images: number } };
 // GET /api/images/[id]/refs — 이 이미지를 원본으로 둔 고친 버전 수, 입력으로 쓴 요청 수
 export type ImageRefsDto = { children: number; inputFor: number };
 // counts: 삭제 확인창이 말하는 수. images 는 생성·고침 이미지, linkedConversations 는 이 대화의 이미지를 원본으로 쓰는 다른 대화 수

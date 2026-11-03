@@ -59,14 +59,17 @@ export function TrashView() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.images.lists });
   }
 
-  async function run(action: () => Promise<unknown>, done: string, failed: string) {
+  // 성공하면 true. 실패는 토스트로 알리고 부른 쪽이 화면(확인창)을 유지할 수 있게 false
+  async function run(action: () => Promise<unknown>, done: string, failed: string): Promise<boolean> {
     setBusy(true);
     try {
       await action();
       invalidate();
       toast.success(done);
+      return true;
     } catch (e) {
       toast.error(errorMessage(e, failed));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -85,12 +88,12 @@ export function TrashView() {
       "삭제하지 못했어요. 다시 시도해 주세요.",
     );
   async function handleEmpty() {
-    await run(() => apiFetch("/api/trash", { method: "DELETE" }), "휴지통을 비웠어요", "비우지 못했어요. 다시 시도해 주세요.");
-    setEmptyOpen(false);
+    const ok = await run(() => apiFetch("/api/trash", { method: "DELETE" }), "휴지통을 비웠어요", "비우지 못했어요. 다시 시도해 주세요.");
+    if (ok) setEmptyOpen(false);
   }
 
   const entries = trash.data ? mergeEntries(trash.data) : [];
-  const counts = { conversations: trash.data?.conversations.length ?? 0, images: trash.data?.images.length ?? 0 };
+  const counts = trash.data?.total ?? { conversations: 0, images: 0 };
 
   let content: React.ReactNode;
   if (trash.isPending) content = <TrashSkeleton />;

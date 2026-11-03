@@ -19,7 +19,7 @@ export async function trashConversation(id: string): Promise<Trashed | null> {
     if (!conversation) return null;
     if (conversation.deletedAt) return { deletedAt: conversation.deletedAt, cancel: [] as string[] };
     const active = await tx.job.findMany({ where: { conversationId: id, status: { in: ACTIVE_STATUSES } }, select: { id: true } });
-    await tx.job.updateMany({ where: { conversationId: id, status: { in: ACTIVE_STATUSES } }, data: { status: "CANCELLED" } });
+    await tx.job.updateMany({ where: { conversationId: id, status: { in: ACTIVE_STATUSES } }, data: { status: "CANCELLED", queuePosition: null } });
     await tx.image.updateMany({ where: { conversationId: id, deletedAt: null }, data: { deletedAt: now } });
     await tx.conversation.update({ where: { id }, data: { deletedAt: now } });
     return { deletedAt: now, cancel: active.map((j) => j.id) };
@@ -60,12 +60,15 @@ export async function restoreImage(id: string): Promise<Image | null> {
 }
 
 const TRASH_LIST_LIMIT = 200;
+const TRASHED_CONVERSATION: Prisma.ConversationWhereInput = { deletedAt: { not: null } };
+// 따로 보이는 이미지: 대화가 휴지통이 아닌 것만(대화와 함께 간 이미지는 대화 줄에 묶인다). 올린 사진은 보이지 않는다
+const TRASHED_IMAGE: Prisma.ImageWhereInput = { deletedAt: { not: null }, kind: { not: "UPLOADED" }, OR: [{ conversationId: null }, { conversation: { deletedAt: null } }] };
 
-// 휴지통 목록. 대화는 그 안의 이미지 수와 함께, 이미지는 대화가 휴지통이 아닌 것만 따로 보인다(올린 사진은 보이지 않는다)
+// 휴지통 목록. 대화는 그 안의 이미지 수와 함께. total 은 목록 상한(200)과 무관한 전체 수(비우기 확인창이 쓴다)
 export async function listTrash(): Promise<TrashDto> {
-  const [conversations, images] = await Promise.all([
+  const [conversations, images, totalConversations, totalImages] = await Promise.all([
     prisma.conversation.findMany({
-      where: { deletedAt: { not: null } },
+      where: TRASHED_CONVERSATION,
       orderBy: [{ deletedAt: "desc" }, { id: "desc" }],
       take: TRASH_LIST_LIMIT,
       include: {
@@ -73,11 +76,9 @@ export async function listTrash(): Promise<TrashDto> {
         images: { where: { kind: { not: "UPLOADED" } }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true } },
       },
     }),
-    prisma.image.findMany({
-      where: { deletedAt: { not: null }, kind: { not: "UPLOADED" }, OR: [{ conversationId: null }, { conversation: { deletedAt: null } }] },
-      orderBy: [{ deletedAt: "desc" }, { id: "desc" }],
-      take: TRASH_LIST_LIMIT,
-    }),
+    prisma.image.findMany({ where: TRASHED_IMAGE, orderBy: [{ deletedAt: "desc" }, { id: "desc" }], take: TRASH_LIST_LIMIT }),
+    prisma.conversation.count({ where: TRASHED_CONVERSATION }),
+    prisma.image.count({ where: TRASHED_IMAGE }),
   ]);
   return {
     conversations: conversations.map((c) => ({
@@ -87,36 +88,43 @@ export async function listTrash(): Promise<TrashDto> {
       imageCount: c._count.images,
     })),
     images: images.map((i) => ({ ...toImageDto(i), deletedAt: i.deletedAt!.toISOString(), expiresAt: trashExpiresAt(i.deletedAt!).toISOString() })),
+    total: { conversations: totalConversations, images: totalImages },
   };
 }
 
 export type PurgeOptions = { conversationIds?: string[]; imageIds?: string[]; before?: Date };
 
 // 휴지통 항목을 영구 삭제한다. id 를 주면 그것만, 안 주면 전부(before 가 있으면 그보다 먼저 옮긴 것만).
-// 행을 먼저 지우고(잡·이미지는 cascade) 파일은 그다음에 지운다
+// 고르기와 지우기를 한 트랜잭션에서 해, 그 사이에 복구된 항목(deletedAt null)은 건드리지 않는다. 파일은 행을 지운 뒤 지운다
 export async function purgeTrash(opts: PurgeOptions): Promise<{ conversations: number; images: number }> {
   const all = !opts.conversationIds && !opts.imageIds;
   const deletedAt: Prisma.DateTimeNullableFilter = opts.before ? { not: null, lte: opts.before } : { not: null };
-  const conversations =
-    all || opts.conversationIds
-      ? await prisma.conversation.findMany({
-          where: { deletedAt, ...(opts.conversationIds ? { id: { in: opts.conversationIds } } : {}) },
-          select: { id: true, images: { select: { id: true } } },
-        })
-      : [];
-  const conversationIds = conversations.map((c) => c.id);
-  const images =
-    all || opts.imageIds
-      ? await prisma.image.findMany({
-          where: { deletedAt, ...(opts.imageIds ? { id: { in: opts.imageIds } } : {}), ...(conversationIds.length ? { conversationId: { notIn: conversationIds } } : {}) },
-          select: { id: true },
-        })
-      : [];
+  const { conversations, images } = await prisma.$transaction(async (tx) => {
+    const conversations =
+      all || opts.conversationIds
+        ? await tx.conversation.findMany({
+            where: { deletedAt, ...(opts.conversationIds ? { id: { in: opts.conversationIds } } : {}) },
+            select: { id: true, images: { select: { id: true } } },
+          })
+        : [];
+    const conversationIds = conversations.map((c) => c.id);
+    // 지울 대화에 딸린 이미지는 cascade 로 가므로 뺀다. NOT IN 은 conversationId 가 NULL 인 행을 거르므로 따로 둔다
+    const images =
+      all || opts.imageIds
+        ? await tx.image.findMany({
+            where: {
+              deletedAt,
+              ...(opts.imageIds ? { id: { in: opts.imageIds } } : {}),
+              ...(conversationIds.length ? { OR: [{ conversationId: null }, { conversationId: { notIn: conversationIds } }] } : {}),
+            },
+            select: { id: true },
+          })
+        : [];
+    await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } });
+    await tx.image.deleteMany({ where: { id: { in: images.map((i) => i.id) } } });
+    return { conversations, images };
+  });
   const fileIds = [...conversations.flatMap((c) => c.images.map((i) => i.id)), ...images.map((i) => i.id)];
-  await prisma.$transaction([
-    prisma.conversation.deleteMany({ where: { id: { in: conversationIds } } }),
-    prisma.image.deleteMany({ where: { id: { in: images.map((i) => i.id) } } }),
-  ]);
   await Promise.all(fileIds.map((id) => deleteImageFiles(id)));
   return { conversations: conversations.length, images: fileIds.length };
 }
@@ -132,4 +140,14 @@ export async function purgeStaleUploads(now = new Date()): Promise<number> {
   await prisma.image.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
   await Promise.all(rows.map((r) => deleteImageFiles(r.id)));
   return rows.length;
+}
+
+// 쓰기 요청(삭제·업로드)이 끝난 뒤 돌리는 정리. 읽기(GET)는 아무것도 지우지 않는다. 실패는 요청에 영향을 주지 않고 로그만 남긴다
+export async function collectGarbage(): Promise<void> {
+  try {
+    await purgeExpired();
+    await purgeStaleUploads();
+  } catch (e) {
+    console.error("[trash] gc", (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
+  }
 }
