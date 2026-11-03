@@ -27,6 +27,9 @@ __pycache__/
 # 브라우저 도구 산출물
 .playwright-mcp/
 
+# 에이전트 작업 기록 (superpowers 플랜 진행 장부·리뷰 자료)
+/.superpowers/
+
 # 비밀값 (.env.example 은 커밋)
 .env
 .env.*
