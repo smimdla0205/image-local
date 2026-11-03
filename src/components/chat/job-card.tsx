@@ -22,7 +22,6 @@ export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel
     const timer = setTimeout(() => setSlow(true), SLOW_START_MS);
     return () => clearTimeout(timer);
   }, [starting]);
-  const slowStart = starting && slow;
 
   const steps = `${job.step} / ${job.steps} step`;
   let title: string;
@@ -31,13 +30,13 @@ export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel
   switch (job.status) {
     case "QUEUED":
       title = "대기 중";
-      detail = job.queuePosition && job.queuePosition > 0 ? `앞에 ${job.queuePosition}건` : slowStart ? SLOW_START_TEXT : "곧 시작해요";
+      detail = job.queuePosition && job.queuePosition > 0 ? `앞에 ${job.queuePosition}건` : "곧 시작해요";
       action = { label: "취소", run: onCancel };
       break;
     case "RUNNING":
       title = job.kind === "EDIT" ? "고치는 중" : "생성 중";
       // 마지막 step 뒤에는 결과를 받아 저장하는 중이다
-      detail = slowStart ? SLOW_START_TEXT : job.step >= job.steps ? "마무리하는 중" : steps;
+      detail = job.step >= job.steps ? "마무리하는 중" : steps;
       action = { label: "중지", run: onCancel };
       break;
     case "FAILED":
@@ -49,6 +48,8 @@ export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel
       detail = steps;
       action = onRegenerate && { label: "다시 생성", run: onRegenerate };
   }
+  // 대기 0건·0 step 이 오래가면 위 문구 대신 GPU 를 깨우는 중이라고 알린다(starting 은 그 두 경우에만 참)
+  if (starting && slow) detail = SLOW_START_TEXT;
   const active = isActive(job.status);
   return (
     <div role="status" className="flex flex-col gap-3 rounded-md border bg-card p-4">

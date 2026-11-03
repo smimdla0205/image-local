@@ -3,7 +3,7 @@
 import { type InfiniteData, type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { XIcon } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
 
@@ -32,7 +32,6 @@ function findCachedImage(queryClient: QueryClient, id: string): ImageDto | undef
 
 // 이미지 뷰어. 어느 화면에서든 ?image=<id> 가 있으면 열린다(딥링크). 닫으면 image 만 지우고 검색·필터는 남긴다
 export function ImageViewerDialog() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -50,7 +49,8 @@ export function ImageViewerDialog() {
     const params = new URLSearchParams(searchParams);
     params.delete("image");
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    // 주소만 바꾼다(Next 가 useSearchParams 와 맞추고 페이지를 서버에서 다시 그리지 않는다 — 여는 쪽 ViewerLink 와 같음)
+    window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
   }
 
   async function handleDelete() {
@@ -90,7 +90,7 @@ export function ImageViewerDialog() {
           <div className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             {/* 큰 이미지를 받는 동안 이미 받아 둔 썸네일을 같은 자리에 깔아 둔다(thumb-under) */}
             <div
-              className="thumb-under self-start rounded-md bg-contain bg-center bg-no-repeat"
+              className="thumb-under self-start rounded-md"
               style={{ "--thumb": `url(${JSON.stringify(image.data.thumbUrl)})` } as CSSProperties}
             >
               <FadeImage
@@ -98,7 +98,6 @@ export function ImageViewerDialog() {
                 alt={image.data.prompt ?? "올린 사진"}
                 width={image.data.width}
                 height={image.data.height}
-                decoding="async"
                 fetchPriority="high"
                 className={cn("block h-auto max-h-[70dvh] w-full rounded-md object-contain", image.data.hasAlpha && "checker")}
               />

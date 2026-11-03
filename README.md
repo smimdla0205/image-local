@@ -75,18 +75,19 @@ imagen-local/
 │   │   ├── c/[id]/            # 대화 화면, 없는 대화 화면
 │   │   ├── gallery/           # 갤러리: 검색·모델 필터
 │   │   └── api/
-│   │       ├── conversations/ # 목록·생성, [id] 조회(워커 동기화)·삭제, [id]/jobs 잡 추가
+│   │       ├── conversations/ # 목록·생성, [id] 조회(워커 동기화)·삭제, [id]/jobs 잡 추가·진행 중인 잡만 동기화(?ids=)
 │   │       ├── jobs/[id]/     # GET 상태(워커 폴링 동기화)·DELETE 취소
 │   │       ├── images/        # 갤러리 목록, [id] 조회·삭제
 │   │       ├── uploads/       # 고칠 사진 올리기
-│   │       └── files/         # 저장한 이미지·썸네일 서빙
+│   │       └── files/         # 저장한 원본 PNG·썸네일·화면용 WebP(previews) 서빙. 화면용이 없는 이전 이미지는 처음 요청할 때 만든다
 │   ├── components/
 │   │   ├── providers.tsx      # React Query, 테마, 툴팁, 토스트
+│   │   ├── fade-image.tsx     # 받는 동안 자리(.image-frame)를 깜빡이고 다 받으면 나타나는 img
 │   │   ├── ui/                # shadcn 생성물
 │   │   ├── shell/             # 앱 틀, 사이드바(대화 목록), 상단바
 │   │   ├── chat/              # 새 대화, 대화 화면, 입력창, 결과·진행 카드, 비교 슬라이더
 │   │   ├── gallery/           # 갤러리 격자·필터
-│   │   └── viewer/            # 이미지 뷰어(?image= 딥링크)
+│   │   └── viewer/            # 이미지 뷰어(?image= 딥링크), 주소만 바꿔 여는 ViewerLink
 │   ├── hooks/
 │   ├── lib/
 │   │   ├── db.ts              # Prisma 클라이언트 (better-sqlite3 어댑터)
@@ -96,7 +97,7 @@ imagen-local/
 │   │   ├── query-keys.ts      # React Query 키
 │   │   ├── streams.ts         # 크기 상한을 세며 스트림 읽기
 │   │   ├── storage/           # 이미지 저장. 로컬 파일 → S3 로 바꾸는 자리
-│   │   ├── images/            # sharp: 회전 보정·축소·썸네일
+│   │   ├── images/            # sharp: 회전 보정·축소·썸네일·화면용 WebP
 │   │   ├── gpu/               # config.ts(GPU 종류·개수), 모델 표, 크기 표, 워커 HTTP 클라이언트
 │   │   └── jobs/              # 잡 만들기·조회·워커 동기화·상태 전이
 │   └── generated/prisma/      # prisma generate 결과물. git 에 올리지 않는다

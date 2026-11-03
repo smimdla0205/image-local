@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { ERROR_MESSAGES } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/client";
-import { inspectPng, makePreview, makeThumb } from "@/lib/images/normalize";
+import { inspectPng, makeVariants } from "@/lib/images/normalize";
 import { submitToWorker } from "@/lib/jobs/create";
 import { type JobWithImages, reloadJobs } from "@/lib/jobs/queries";
 import type { WorkerState } from "@/lib/jobs/schemas";
@@ -37,12 +37,10 @@ class JobNoLongerActive extends Error {}
 async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
   const png = await getWorkerClient().getOutput(job.id);
   let info: Awaited<ReturnType<typeof inspectPng>>;
-  let thumb: Uint8Array;
-  let preview: Uint8Array;
+  let variants: Awaited<ReturnType<typeof makeVariants>>;
   try {
-    info = await inspectPng(png);
-    thumb = await makeThumb(png);
-    preview = await makePreview(png);
+    // 서로 기다릴 필요가 없어 함께 만든다(결과를 저장하는 폴링 응답이 그만큼 덜 막힌다)
+    [info, variants] = await Promise.all([inspectPng(png), makeVariants(png)]);
   } catch {
     // 워커가 읽을 수 없는 이미지를 돌려줬다. 다시 받아도 같으므로 실패로 끝낸다
     await patchIfActive(job.id, { status: "FAILED", error: ERROR_MESSAGES.internal_error });
@@ -50,7 +48,7 @@ async function saveOutput(job: JobWithImages, patch: JobPatch): Promise<void> {
   }
   const imageId = randomUUID().replaceAll("-", "");
   try {
-    await putImageFiles(imageId, png, thumb, preview);
+    await putImageFiles(imageId, png, variants.thumb, variants.preview);
     await prisma.$transaction(async (tx) => {
       // 아직 진행 중일 때만 완료로 바꾼다(그 사이 취소·실패된 잡을 덮지 않는다)
       const claimed = await tx.job.updateMany({ where: { id: job.id, status: { in: ACTIVE_STATUSES } }, data: patch });

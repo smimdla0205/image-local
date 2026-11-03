@@ -118,8 +118,7 @@ export function ViewerPanel({ image, onDelete }: { image: ImageDto; onDelete: ()
         )}
       </div>
 
-      {/* 되돌릴 수 없다는 안내는 확인 창이 한다 */}
-      <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+      <div className="flex border-t pt-4">
         <Button type="button" variant="outline" className={`${DANGER_TEXT} max-md:h-11`} onClick={() => setConfirmOpen(true)}>
           <Trash2Icon aria-hidden="true" />
           삭제

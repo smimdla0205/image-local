@@ -166,10 +166,9 @@
   html {
     @apply font-sans;
   }
-  /* 누를 수 있는 버튼·스위치는 손가락 커서다(Tailwind 4 는 버튼에 기본 화살표를 둔다). 비활성은 그대로 둔다 */
-  button:not(:disabled):not([aria-disabled="true"]),
-  [role="button"]:not([aria-disabled="true"]),
-  [role="switch"]:not([aria-disabled="true"]) {
+  /* 누를 수 있는 것(버튼·스위치·메뉴 항목·선택 항목)은 손가락 커서다(Tailwind 4 는 버튼에 기본 화살표를 둔다). 비활성은 그대로 둔다.
+     역할로 고르므로 새 프리미티브도 역할만 맞으면 따로 고치지 않는다 */
+  :is(button, [role="button"], [role="switch"], [role="option"], [role^="menuitem"]):not(:disabled, [aria-disabled="true"], [data-disabled]) {
     cursor: pointer;
   }
 }
@@ -197,8 +196,9 @@
 
 /* 이미지를 받는 동안: 이미지는 투명하고 자리(.image-frame, muted)는 은은하게 깜빡인다. 다 받으면 짧게 나타난다(FadeImage).
    깜빡임은 틀 위 의사 요소의 opacity 로 해 합성 단계에서 돈다(화면 밖 지연 로딩 틀이 많아도 가볍다).
-   한 틀에 겹친 여러 장(비교 슬라이더, .image-frame-together)은 모두 받은 뒤 함께 보인다. 움직임 줄이기면 바로 바꾼다 */
-img[data-loading] {
+   한 틀의 이미지는 모두 받은 뒤 함께 보인다(비교 슬라이더처럼 겹친 두 장). 움직임 줄이기면 바로 바꾼다 */
+img[data-loading],
+.image-frame:has(img[data-loading]) img {
   opacity: 0;
 }
 .fade-image {
@@ -216,14 +216,10 @@ img[data-loading] {
   pointer-events: none;
   animation: image-loading 1.6s ease-in-out infinite;
 }
-.image-frame-together:has(img[data-loading]) img {
-  opacity: 0;
-}
 /* 뷰어: 큰 이미지를 받는 동안만 같은 자리에 썸네일(--thumb)과 자리 바탕(muted)을 깔아 둔다.
    다 받으면 걷어 내 투명 배경 뒤로 비치거나 이미지 옆(object-contain 여백)에 회색 띠가 남지 않게 한다 */
 .thumb-under:has(img[data-loading]) {
-  background-color: var(--muted);
-  background-image: var(--thumb);
+  background: var(--muted) var(--thumb) center / contain no-repeat;
 }
 /* 썸네일 위에서는 페이드하지 않고 바로 바꾼다(페이드하는 동안 썸네일이 걷혀 빈 바탕이 비친다) */
 .thumb-under .fade-image {

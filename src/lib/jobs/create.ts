@@ -13,7 +13,7 @@ import { ACTIVE_WINDOW_MS, assertCapacity } from "@/lib/jobs/capacity";
 import { jobInclude, type JobWithImages, reloadJobs } from "@/lib/jobs/queries";
 import { type createJobsBodySchema, SEED_MAX, type WorkerState } from "@/lib/jobs/schemas";
 import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
-import { readFile, storageKey } from "@/lib/storage";
+import { readFileIfExists, storageKey } from "@/lib/storage";
 
 export type CreateJobsInput = z.output<typeof createJobsBodySchema>;
 
@@ -95,11 +95,8 @@ export async function submitToWorker(job: JobWithImages, inputIds: Map<string, s
       }
       inputId = inputIds.get(job.inputImage.id) ?? null;
       if (!inputId) {
-        let bytes: Uint8Array;
-        try {
-          bytes = await readFile(storageKey("images", job.inputImage.id));
-        } catch (e) {
-          if ((e as { code?: string }).code !== "ENOENT") throw e;
+        const bytes = await readFileIfExists(storageKey("images", job.inputImage.id));
+        if (!bytes) {
           await markFailed(job.id, ERROR_MESSAGES.input_image_not_found);
           return "submitted";
         }

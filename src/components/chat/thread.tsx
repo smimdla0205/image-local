@@ -24,7 +24,7 @@ function UserBubble({ job }: { job: JobDto }) {
       {job.kind === "EDIT" &&
         (job.inputImage ? (
           <figure className="image-frame relative m-0 w-24 overflow-hidden rounded-md bg-muted">
-            <FadeImage src={job.inputImage.thumbUrl} alt={`고칠 이미지: 버전 ${job.inputImage.version}`} decoding="async" className="block aspect-square w-full object-cover" />
+            <FadeImage src={job.inputImage.thumbUrl} alt={`고칠 이미지: 버전 ${job.inputImage.version}`} className="block aspect-square w-full object-cover" />
             <figcaption className="absolute bottom-1 left-1 rounded-sm bg-overlay px-1.5 text-micro text-overlay-foreground">버전 {job.inputImage.version}</figcaption>
           </figure>
         ) : (

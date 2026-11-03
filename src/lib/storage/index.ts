@@ -12,7 +12,8 @@ export const STORAGE_DIR = path.resolve(/*turbopackIgnore: true*/ process.env.ST
 
 export const FILE_NAME_RE = /^[a-z0-9]+\.(png|webp)$/;
 const EXTENSION: Record<StorageKind, string> = { images: "png", thumbs: "webp", previews: "webp" };
-const KEY_RE = /^(images|thumbs|previews)\/[a-z0-9]+\.(png|webp)$/;
+const KINDS = Object.keys(EXTENSION) as StorageKind[];
+const KEY_RE = new RegExp(`^(${KINDS.join("|")})/[a-z0-9]+\\.(png|webp)$`);
 
 export function storageKey(kind: StorageKind, id: string): string {
   return `${kind}/${id}.${EXTENSION[kind]}`;
@@ -52,17 +53,30 @@ export async function readFile(key: string): Promise<Uint8Array<ArrayBuffer>> {
   return (await fs.readFile(/*turbopackIgnore: true*/ keyPath(key))) as Uint8Array<ArrayBuffer>;
 }
 
+// 파일이 없으면 null(그 밖의 읽기 오류는 던진다)
+export async function readFileIfExists(key: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  try {
+    return await readFile(key);
+  } catch (e) {
+    if ((e as { code?: string }).code === "ENOENT") return null;
+    throw e;
+  }
+}
+
 export async function deleteFile(key: string): Promise<void> {
   await fs.rm(keyPath(key), { force: true });
 }
 
-// 이미지 한 장의 원본(PNG)·썸네일·화면용 미리보기를 쓴다(원본 먼저, 나머지 둘은 함께)
+// 이미지 한 장의 원본(PNG)·썸네일·화면용 미리보기를 쓴다(원본 먼저, 나머지 둘은 함께).
+// 둘 다 끝난 뒤 실패를 던진다(먼저 던지면 부른 쪽이 지우는 사이 다른 쪽 쓰기가 끝나 파일이 남는다)
 export async function putImageFiles(id: string, png: Uint8Array, thumb: Uint8Array, preview: Uint8Array): Promise<void> {
   await putFile(storageKey("images", id), png);
-  await Promise.all([putFile(storageKey("thumbs", id), thumb), putFile(storageKey("previews", id), preview)]);
+  const results = await Promise.allSettled([putFile(storageKey("thumbs", id), thumb), putFile(storageKey("previews", id), preview)]);
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed) throw failed.reason;
 }
 
 // 세 파일을 함께 지운다. 하나가 실패해도 나머지는 지우고, 오류는 던지지 않는다
 export async function deleteImageFiles(id: string): Promise<void> {
-  await Promise.allSettled([deleteFile(storageKey("images", id)), deleteFile(storageKey("thumbs", id)), deleteFile(storageKey("previews", id))]);
+  await Promise.allSettled(KINDS.map((kind) => deleteFile(storageKey(kind, id))));
 }

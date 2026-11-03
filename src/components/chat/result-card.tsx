@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { CompareSlider } from "@/components/chat/compare-slider";
 import { JobCard } from "@/components/chat/job-card";
 import { FadeImage } from "@/components/fade-image";
+import { ViewerLink } from "@/components/viewer/viewer-link";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { getModel, type ModelId } from "@/lib/gpu/models";
@@ -24,9 +25,9 @@ type Handlers = { onEdit: (img: ImageDto) => void; onRegenerate: (jobs: JobDto[]
 function TileActions({ image, model, onEdit }: { image: ImageDto; model: ModelId; onEdit: Handlers["onEdit"] }) {
   return (
     <div className="hover-actions absolute top-2 right-2 flex gap-1">
-      <Link href={`?image=${image.id}`} scroll={false} aria-label="크게 보기" className={FLOAT_CLASS}>
+      <ViewerLink href={`?image=${image.id}`} aria-label="크게 보기" className={FLOAT_CLASS}>
         <Maximize2Icon aria-hidden="true" className="size-4" />
-      </Link>
+      </ViewerLink>
       {getModel(model).canEdit ? (
         <button type="button" aria-label="이어서 고치기" onClick={() => onEdit(image)} className={FLOAT_CLASS}>
           <PencilIcon aria-hidden="true" className="size-4" />
@@ -47,17 +48,16 @@ function ImageTile({ image, model, onEdit }: { image: ImageDto; model: ModelId; 
   return (
     <figure className="image-frame group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
-      <Link href={`?image=${image.id}`} scroll={false} tabIndex={-1} className="block cursor-zoom-in">
+      <ViewerLink href={`?image=${image.id}`} tabIndex={-1} className="block cursor-zoom-in">
         <FadeImage
           src={image.previewUrl}
           alt={image.prompt ?? ""}
           width={image.width}
           height={image.height}
           loading="lazy"
-          decoding="async"
           className={cn("block h-auto w-full", image.hasAlpha && "checker")}
         />
-      </Link>
+      </ViewerLink>
       <TileActions image={image} model={model} onEdit={onEdit} />
     </figure>
   );

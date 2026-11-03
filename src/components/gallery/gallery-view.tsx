@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { cn } from "cn";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
@@ -47,8 +47,9 @@ export function GalleryView() {
     },
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
-    // 검색·필터를 바꾸면 새 결과가 올 때까지 이전 결과를 흐리게 남긴다(자리표시로 깜빡이지 않게)
-    placeholderData: keepPreviousData,
+    // 검색·필터를 바꾸면 새 결과가 올 때까지 이전 결과를 흐리게 남긴다(자리표시로 깜빡이지 않게).
+    // 이전 결과가 비어 있었으면 남기지 않는다(받기 전에 결과 없음을 보이지 않고 자리표시를 보인다)
+    placeholderData: (previous) => (previous?.pages.some((p) => p.items.length > 0) ? previous : undefined),
   });
 
   // 필터를 주소에 반영한다(뷰어가 열려 있으면 그대로 둔다)
@@ -69,8 +70,7 @@ export function GalleryView() {
   const filtered = q !== "" || model !== "";
 
   let content: React.ReactNode;
-  // 이전 결과가 비어 있었으면 새 결과를 받는 동안 '없음' 대신 자리표시를 보인다(받기 전에 결과 없음을 보이지 않는다)
-  if (images.isPending || (images.isPlaceholderData && items.length === 0)) content = <GridSkeleton />;
+  if (images.isPending) content = <GridSkeleton />;
   // 받은 목록이 있으면(다음 페이지만 실패) 격자를 남기고 '더 보기' 옆에서 알린다
   else if (images.isError && !images.data) content = <p className="py-16 text-center text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
   else if (items.length === 0) content = <p className="py-16 text-center text-caption text-muted-foreground">{filtered ? "찾는 이미지가 없어요" : "아직 만든 이미지가 없어요"}</p>;

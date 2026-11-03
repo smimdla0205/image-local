@@ -20,7 +20,7 @@ import { type ConversationDetailDto, type ImageDto, type JobDto, type JobsDto, p
 import { isActive } from "@/lib/jobs/transitions";
 import { queryKeys } from "@/lib/query-keys";
 
-// 진행 중인 잡이 있을 때 다시 묻는 간격(GET 이 워커와 맞춘다). 생성 중이면 1.5초, 대기만 남았으면 3초
+// 진행 중인 잡이 있을 때 다시 묻는 간격(GET 이 워커와 맞춘다). step 이 나아가는 중이면 1.5초, 대기·0 step 뿐이면 3초
 const POLL_MS = 1500;
 const QUEUED_POLL_MS = 3000;
 
@@ -35,8 +35,7 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
   const query = useQuery({
     queryKey: queryKeys.conversations.detail(id),
     // 진행 중인 잡이 있으면 그 잡만 묻고 합친다. 합친 뒤 진행 중인 잡이 없으면(다 끝남) 다른 곳에서 더한 요청까지 보이게 전체를 한 번 받는다
-    queryFn: async () => {
-      const key = queryKeys.conversations.detail(id);
+    queryFn: async ({ queryKey: key }) => {
       const fetchDetail = () => apiFetch<ConversationDetailDto>(`/api/conversations/${id}`);
       const activeIds = queryClient
         .getQueryData<ConversationDetailDto>(key)
@@ -59,7 +58,8 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     refetchInterval: (q) => {
       const jobs = q.state.data?.jobs ?? [];
       if (!jobs.some((j) => isActive(j.status))) return false;
-      return jobs.some((j) => j.status === "RUNNING") ? POLL_MS : QUEUED_POLL_MS;
+      // 단계가 실제로 나아갈 때만 짧게 묻는다(대기나 0 step — GPU 가 깨는 동안 — 은 3초)
+      return jobs.some((j) => j.status === "RUNNING" && j.step > 0) ? POLL_MS : QUEUED_POLL_MS;
     },
   });
   const detail = query.data;

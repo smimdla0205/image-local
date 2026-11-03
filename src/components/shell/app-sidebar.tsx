@@ -58,25 +58,26 @@ function ConversationList() {
           <ul className="flex flex-col gap-0.5">
             {group.items.map((c) => {
               const href = `/c/${c.id}`;
+              const title = c.title ?? "제목 없음";
               return (
                 <li key={c.id}>
                   <Link
                     href={href}
                     aria-current={pathname === href ? "page" : undefined}
                     // 잘린 제목은 마우스를 올리면 전체를 보인다
-                    title={c.title ?? "제목 없음"}
+                    title={title}
                     onClick={() => setOpenMobile(false)}
                     className="flex min-h-9 items-center gap-2.5 rounded-md px-2 py-1.5 text-label font-normal outline-none hover:bg-sidebar-accent focus-visible:shadow-focus-ring aria-[current=page]:bg-sidebar-accent max-md:min-h-11"
                   >
                     {c.thumbUrl ? (
                       // 대화가 많으면 목록 아래쪽 썸네일은 보일 때 받는다
                       <span className="image-frame size-6 shrink-0 overflow-hidden rounded-sm bg-muted">
-                        <FadeImage src={c.thumbUrl} alt="" width={24} height={24} loading="lazy" decoding="async" className="size-full object-cover" />
+                        <FadeImage src={c.thumbUrl} alt="" width={24} height={24} loading="lazy" className="size-full object-cover" />
                       </span>
                     ) : (
                       <span aria-hidden="true" className="size-6 shrink-0 rounded-sm bg-secondary" />
                     )}
-                    <span className="min-w-0 truncate">{c.title ?? "제목 없음"}</span>
+                    <span className="min-w-0 truncate">{title}</span>
                   </Link>
                 </li>
               );

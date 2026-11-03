@@ -7,22 +7,21 @@ import { FadeImage } from "@/components/fade-image";
 import type { ImageDto } from "@/lib/jobs/schemas";
 
 // 고치기 전(왼쪽)과 후(오른쪽)를 겹쳐 놓고 경계선을 움직여 비교한다. 투명한 range 입력이 위를 덮어 키보드(화살표)로도 움직인다.
-// 입력이 투명하므로 키보드 포커스는 바깥 틀의 포커스 링으로 보여 준다. 두 장은 다 받은 뒤 함께 보인다(image-frame-together)
+// 입력이 투명하므로 키보드 포커스는 바깥 틀의 포커스 링으로 보여 준다. 두 장은 다 받은 뒤 함께 보인다(image-frame)
 export function CompareSlider({ before, after }: { before: ImageDto; after: ImageDto }) {
   const [pos, setPos] = useState(50);
   const id = useId();
   return (
     <div
       data-testid="compare-slider"
-      className="image-frame image-frame-together relative w-full overflow-hidden rounded-md bg-muted has-focus-visible:shadow-focus-ring"
+      className="image-frame relative w-full overflow-hidden rounded-md bg-muted has-focus-visible:shadow-focus-ring"
       style={{ aspectRatio: `${after.width} / ${after.height}` }}
     >
-      <FadeImage src={after.previewUrl} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      <FadeImage src={after.previewUrl} alt={`버전 ${after.version}: ${after.prompt ?? ""}`} loading="lazy" className="absolute inset-0 size-full object-cover" />
       <FadeImage
         src={before.previewUrl}
         alt={`버전 ${before.version}`}
         loading="lazy"
-        decoding="async"
         className="absolute inset-0 size-full object-cover"
         style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
       />

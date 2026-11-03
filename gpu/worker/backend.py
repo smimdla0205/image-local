@@ -220,6 +220,13 @@ class MockBackend:
                 logger.exception("mock 잡 처리 실패: %s", job_id)
                 self.store.transition(job_id, ACTIVE_STATUSES, status="failed", error="워커 내부 오류예요")
 
+    def _cancel_if_requested(self, job_id: str) -> bool:
+        """중지 요청이 있으면 실행 중인 잡을 cancelled 로 바꾸고 True."""
+        if not self.store.get_meta(job_id, CANCEL_REQUESTED):
+            return False
+        self.store.transition(job_id, ("running",), status="cancelled")
+        return True
+
     def _run(self, job_id: str) -> None:
         record = claim_queued(self.store, job_id)
         if record is None:
@@ -232,15 +239,13 @@ class MockBackend:
         if prompt.startswith("[stall]"):
             # 0 step 에 머물다 취소되면 끝난다(GPU 가 늦게 깨는 경우를 흉내)
             while not self._stop.wait(self.step_interval):
-                if self.store.get_meta(job_id, CANCEL_REQUESTED):
-                    self.store.transition(job_id, ("running",), status="cancelled")
+                if self._cancel_if_requested(job_id):
                     return
             return
         for step in range(1, total + 1):
             if self._stop.wait(self.step_interval):
                 return
-            if self.store.get_meta(job_id, CANCEL_REQUESTED):
-                self.store.transition(job_id, ("running",), status="cancelled")
+            if self._cancel_if_requested(job_id):
                 return
             if self.store.transition(job_id, ("running",), step=step) is None:
                 return

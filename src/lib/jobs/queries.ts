@@ -3,6 +3,7 @@ import type { Conversation, Image, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { isModelId, type ModelId } from "@/lib/gpu/models";
 import { type ConversationDetailDto, type ConversationDto, DETAIL_JOB_LIMIT, type ImageDto, type JobDto, type WorkerState } from "@/lib/jobs/schemas";
+import { type StorageKind, storageKey } from "@/lib/storage";
 
 export const jobInclude = { image: true, inputImage: true } as const satisfies Prisma.JobInclude;
 export type JobWithImages = Prisma.JobGetPayload<{ include: typeof jobInclude }>;
@@ -15,7 +16,8 @@ function toModelId(model: string): ModelId {
 
 // url: PNG 원본(다운로드), thumbUrl: 목록용 썸네일, previewUrl: 화면용 WebP
 export function imageUrls(id: string): { url: string; thumbUrl: string; previewUrl: string } {
-  return { url: `/api/files/images/${id}.png`, thumbUrl: `/api/files/thumbs/${id}.webp`, previewUrl: `/api/files/previews/${id}.webp` };
+  const file = (kind: StorageKind) => `/api/files/${storageKey(kind, id)}`;
+  return { url: file("images"), thumbUrl: file("thumbs"), previewUrl: file("previews") };
 }
 
 export function toImageDto(i: Image): ImageDto {

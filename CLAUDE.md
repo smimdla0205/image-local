@@ -42,7 +42,7 @@ UI 는 [imagen-local 디자인 시스템](https://claude.ai/artifact/YFBRYfyRPFq
 ## 구현할 때 볼 것
 
 - Qwen-Image-2.1-Turbo 는 step 스케줄이 체크포인트에 들어 있어 `num_inference_steps` 로 바뀌지 않는다.
-- 완료 통지는 폴링이다. `GET /api/conversations/[id]`·`GET /api/jobs/[id]` 가 응답 전에 진행 중인 잡을 워커와 맞추고(`src/lib/jobs/sync.ts`), 워커가 꺼져 있으면 잡을 그대로 두고 `worker.reachable=false` 를 돌려준다. webhook 은 없다.
+- 완료 통지는 폴링이다. `GET /api/conversations/[id]`·`GET /api/jobs/[id]`·`GET /api/conversations/[id]/jobs?ids=` 가 응답 전에 진행 중인 잡을 워커와 맞추고(`src/lib/jobs/sync.ts`), 워커가 꺼져 있으면 잡을 그대로 두고 `worker.reachable=false` 를 돌려준다. webhook 은 없다. 대화 화면은 진행 중인 잡만 `?ids=` 로 묻고(step 이 나아가면 1.5초, 대기·0 step 이면 3초), 잡이 다 끝나거나 사용자 동작으로 무효화되면 대화 전체를 다시 받는다.
 - GPU 워커는 Modal 앱(`gpu/modal_app.py`)이다. 실행·배포 명령은 README 의 'GPU 워커' 절에 있다.
 - ComfyUI 워크플로는 `gpu/workflows/` 의 API 포맷 JSON 이고, 잡 값을 넣을 노드 입력은 `bindings.json` 이 정한다. 손으로 고치지 않고 작업공간 루트의 `tests/imagen-local/tools/export-workflows.mjs` 로 공식 템플릿에서 다시 내보낸다. 프롬프트 보강(TextGenerate)은 Klein 만들기에만 켜 있다. Klein 고치기는 한 번에 90초가 걸려 껐고, Qwen 은 보강 모델 파일이 없고, MOSS 는 사용자가 쓴 글자·태그를 그대로 쓰려고 껐다.
 - Qwen-Image-2.1 VAE 는 투명 배경을 고르지 않아도 RGBA 를 낸다. 러너가 투명 배경이 아닌 잡의 결과를 RGB 로 바꾼다.

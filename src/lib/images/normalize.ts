@@ -49,3 +49,9 @@ const PREVIEW_QUALITY = 85;
 export async function makePreview(png: Uint8Array): Promise<Uint8Array> {
   return sharp(png).webp({ quality: PREVIEW_QUALITY }).toBuffer();
 }
+
+// 저장할 때 함께 만드는 썸네일·미리보기(서로 기다리지 않게 함께 만든다)
+export async function makeVariants(png: Uint8Array): Promise<{ thumb: Uint8Array; preview: Uint8Array }> {
+  const [thumb, preview] = await Promise.all([makeThumb(png), makePreview(png)]);
+  return { thumb, preview };
+}
