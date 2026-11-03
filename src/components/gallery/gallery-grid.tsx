@@ -32,7 +32,8 @@ const GalleryTile = memo(function GalleryTile({ img, order, onDelete }: { img: I
           className={cn("block aspect-square w-full object-cover", img.hasAlpha && "checker")}
         />
       </ViewerLink>
-      <div className="hover-actions pointer-events-none absolute bottom-2 left-2 flex gap-1">
+      {/* 모델·방식 배지는 올렸을 때만 보이는 보조 표시라 낭독에서 뺀다(방식 이름이 '이어서 고치기' 버튼 이름과 겹친다) */}
+      <div aria-hidden="true" className="hover-actions pointer-events-none absolute bottom-2 left-2 flex gap-1">
         {spec && <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{spec.shortName}</span>}
         <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{img.kind === "EDITED" ? "이어서 고치기" : "텍스트→이미지"}</span>
       </div>
