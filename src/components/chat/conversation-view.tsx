@@ -42,7 +42,8 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
         .getQueryData<ConversationDetailDto>(key)
         ?.jobs.filter((j) => isActive(j.status))
         .map((j) => j.id);
-      if (!activeIds?.length) return fetchDetail();
+      // 무효화(이미지 삭제·취소 같은 사용자 동작)로 다시 받을 때는 진행 중인 잡 밖도 바뀌었으니 전체를 받는다
+      if (!activeIds?.length || queryClient.getQueryState(key)?.isInvalidated) return fetchDetail();
       const synced = await apiFetch<JobsDto>(`/api/conversations/${id}/jobs?ids=${activeIds.join(",")}`);
       // 묻는 사이 보낸 요청(setQueryData)을 잃지 않게 응답이 온 뒤의 캐시에 합친다
       const current = queryClient.getQueryData<ConversationDetailDto>(key);

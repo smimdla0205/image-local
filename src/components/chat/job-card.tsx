@@ -13,8 +13,9 @@ const SLOW_START_TEXT = "GPU를 깨우는 중이에요. 처음엔 2분쯤 걸려
 
 // 결과가 아직 없는 잡 하나: 대기·진행(취소·중지), 실패·중지됨(다시 생성)
 export function JobCard({ job, onCancel, onRegenerate }: { job: JobDto; onCancel: () => void; onRegenerate: (() => void) | null }) {
-  // 대기(앞에 0건)에서 0 step 으로 넘어가도 같은 기다림이라 이어서 잰다. 잡은 이 상태로 돌아오지 않으므로 끝나면 다시 쓰지 않는다
-  const starting = (job.status === "QUEUED" && !job.queuePosition) || (job.status === "RUNNING" && job.step === 0);
+  // 워커가 맨 앞(앞에 0건)이라고 답한 대기에서 0 step 으로 넘어가도 같은 기다림이라 이어서 잰다(워커에 아직 못 보낸 잡은 순번이 없어 빠진다).
+  // 잡은 이 상태로 돌아오지 않으므로 끝나면 다시 쓰지 않는다
+  const starting = (job.status === "QUEUED" && job.queuePosition === 0) || (job.status === "RUNNING" && job.step === 0);
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     if (!starting) return;
