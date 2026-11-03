@@ -25,7 +25,7 @@ function UserBubble({ job }: { job: JobDto }) {
       {job.kind === "EDIT" &&
         (job.inputImage ? (
           <figure className="image-frame relative m-0 w-24 overflow-hidden rounded-md bg-muted">
-            <FadeImage src={job.inputImage.thumbUrl} alt={`고칠 이미지: 버전 ${job.inputImage.version}`} className="block aspect-square w-full object-cover" />
+            <FadeImage src={job.inputImage.thumbUrl} alt={`고칠 이미지: 버전 ${job.inputImage.version}`} loading="lazy" className="block aspect-square w-full object-cover" />
             <figcaption className="absolute bottom-1 left-1 rounded-sm bg-overlay px-1.5 text-micro text-overlay-foreground">버전 {job.inputImage.version}</figcaption>
           </figure>
         ) : (
@@ -48,10 +48,19 @@ type Props = {
 export function Thread({ detail, onEdit, onRegenerate, onCancel, onDelete }: Props) {
   return (
     <div className="flex flex-col gap-8">
-      {groupBatches(detail.jobs).map((batch) => (
+      {groupBatches(detail.jobs).map((batch, i, batches) => (
         <article key={batch.batchId} className="flex flex-col gap-3">
           <UserBubble job={batch.jobs[0]} />
-          <ResultCard jobs={batch.jobs} model={detail.model as ModelId} onEdit={onEdit} onRegenerate={onRegenerate} onCancel={onCancel} onDelete={onDelete} />
+          {/* 화면은 맨 아래(마지막 요청)에서 시작하므로 마지막 결과만 먼저 받는다 */}
+          <ResultCard
+            jobs={batch.jobs}
+            model={detail.model as ModelId}
+            priority={i === batches.length - 1}
+            onEdit={onEdit}
+            onRegenerate={onRegenerate}
+            onCancel={onCancel}
+            onDelete={onDelete}
+          />
         </article>
       ))}
     </div>

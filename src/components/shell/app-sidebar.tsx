@@ -83,7 +83,7 @@ function ConversationList() {
                     {c.thumbUrl ? (
                       // 대화가 많으면 목록 아래쪽 썸네일은 보일 때 받는다
                       <span className="image-frame size-6 shrink-0 overflow-hidden rounded-sm bg-muted">
-                        <FadeImage src={c.thumbUrl} alt="" width={24} height={24} loading="lazy" className="size-full object-cover" />
+                        <FadeImage src={c.thumbUrl} alt="" width={24} height={24} loading="lazy" fetchPriority="low" className="size-full object-cover" />
                       </span>
                     ) : (
                       <span aria-hidden="true" className="size-6 shrink-0 rounded-sm bg-secondary" />

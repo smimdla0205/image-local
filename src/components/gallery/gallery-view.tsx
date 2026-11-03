@@ -106,10 +106,15 @@ export function GalleryView() {
   else
     content = (
       <div aria-busy={images.isPlaceholderData} className={cn("flex flex-col gap-6 motion-safe:transition-opacity", images.isPlaceholderData && "opacity-60")}>
-        {groupByDate(items, new Date(), (img) => img.createdAt).map((group) => (
+        {groupByDate(items, new Date(), (img) => img.createdAt).map((group, i, groups) => (
           <section key={group.label} className="flex flex-col gap-2">
             <h2 className="text-label">{group.label}</h2>
-            <GalleryGrid images={group.items} label={`${group.label} 이미지`} onDelete={setImageToDelete} />
+            <GalleryGrid
+              images={group.items}
+              label={`${group.label} 이미지`}
+              startIndex={groups.slice(0, i).reduce((n, g) => n + g.items.length, 0)}
+              onDelete={setImageToDelete}
+            />
           </section>
         ))}
         {images.isFetchingNextPage && <GridSkeleton announce={false} />}

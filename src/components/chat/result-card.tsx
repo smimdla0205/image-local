@@ -54,7 +54,7 @@ function TileActions({ image, model, onEdit, onDelete }: { image: ImageDto; mode
   );
 }
 
-function ImageTile({ image, model, pos, onEdit, onDelete }: { image: ImageDto; model: ModelId; pos: { n: number; total: number } } & TileHandlers) {
+function ImageTile({ image, model, pos, priority, onEdit, onDelete }: { image: ImageDto; model: ModelId; pos: { n: number; total: number }; priority: boolean } & TileHandlers) {
   return (
     <figure className="image-frame group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
@@ -64,7 +64,8 @@ function ImageTile({ image, model, pos, onEdit, onDelete }: { image: ImageDto; m
           alt={promptAlt(image.prompt, pos)}
           width={image.width}
           height={image.height}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           className={cn("block h-auto w-full", image.hasAlpha && "checker")}
         />
       </ViewerLink>
@@ -73,12 +74,14 @@ function ImageTile({ image, model, pos, onEdit, onDelete }: { image: ImageDto; m
   );
 }
 
-type ResultCardProps = { jobs: JobDto[]; model: ModelId } & Handlers;
+// priority: 화면에 처음 보이는(마지막) 요청의 결과는 먼저 받는다
+type ResultCardProps = { jobs: JobDto[]; model: ModelId; priority?: boolean } & Handlers;
 
 // 폴링마다 대화가 다시 그려져도 잡 객체(캐시가 바뀌지 않은 잡은 그대로)·핸들러가 같으면 이 카드는 다시 그리지 않는다
 function sameBatch(a: ResultCardProps, b: ResultCardProps): boolean {
   return (
     a.model === b.model &&
+    a.priority === b.priority &&
     a.onEdit === b.onEdit &&
     a.onRegenerate === b.onRegenerate &&
     a.onCancel === b.onCancel &&
@@ -89,7 +92,7 @@ function sameBatch(a: ResultCardProps, b: ResultCardProps): boolean {
 }
 
 // 한 요청(배치)의 결과: 배지, 결과 이미지(고치기 1장은 비교 슬라이더), 진행·실패 카드, 다시 생성·프롬프트 복사
-export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRegenerate, onCancel, onDelete }: ResultCardProps) {
+export const ResultCard = memo(function ResultCard({ jobs, model, priority = false, onEdit, onRegenerate, onCancel, onDelete }: ResultCardProps) {
   const first = jobs[0];
   const isEdit = first.kind === "EDIT";
   const active = jobs.filter((j) => isActive(j.status));
@@ -143,7 +146,7 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
       {slider ? (
         <>
           <div className="group relative">
-            <CompareSlider before={slider.before} after={slider.after} />
+            <CompareSlider before={slider.before} after={slider.after} priority={priority} />
             <TileActions image={slider.after} model={model} onEdit={onEdit} onDelete={onDelete} />
           </div>
           <p className="text-caption text-muted-foreground">고치면 요청하지 않은 부분도 조금 바뀔 수 있어요. 마음에 들지 않으면 이전 버전에서 다시 고치세요.</p>
@@ -153,7 +156,7 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
           <div className={cn("grid gap-2", succeeded.length > 1 ? "grid-cols-2" : "max-w-md grid-cols-1")}>
             {succeeded.map((j, i) =>
               j.image ? (
-                <ImageTile key={j.id} image={j.image} model={model} pos={{ n: i + 1, total: succeeded.length }} onEdit={onEdit} onDelete={onDelete} />
+                <ImageTile key={j.id} image={j.image} model={model} pos={{ n: i + 1, total: succeeded.length }} priority={priority} onEdit={onEdit} onDelete={onDelete} />
               ) : (
                 <DeletedImage key={j.id} width={j.width} height={j.height} size="tile" />
               ),
