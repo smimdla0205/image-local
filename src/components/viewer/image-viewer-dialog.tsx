@@ -11,7 +11,7 @@ import { FadeImage } from "@/components/fade-image";
 import { ImageDeleteDialog } from "@/components/image-delete-dialog";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { LoadError } from "@/components/ui/load-error";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
 import { findImage } from "@/lib/jobs/find-image";
@@ -29,6 +29,28 @@ function findCachedImage(queryClient: QueryClient, id: string): ImageDto | undef
     if (hit) return hit;
   }
   return undefined;
+}
+
+// 딥링크로 열어 캐시가 없을 때. 이미지 자리(정사각)와 정보 패널 줄 모양으로 기다린다
+function ViewerSkeleton() {
+  return (
+    <div aria-busy="true" className="grid gap-6 p-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <span className="sr-only">불러오는 중…</span>
+      <Skeleton aria-hidden="true" className="aspect-square w-full" />
+      <div aria-hidden="true" className="flex flex-col gap-3">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-11/12" />
+        <Skeleton className="h-4 w-3/5" />
+        <div className="mt-2 grid grid-cols-[3rem_7.5rem] gap-2">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-4" />
+          ))}
+        </div>
+        <Skeleton className="mt-2 h-9 w-28" />
+        <Skeleton className="h-9 w-32" />
+      </div>
+    </div>
+  );
 }
 
 // 이미지 뷰어. 어느 화면에서든 ?image=<id> 가 있으면 열린다(딥링크). 닫으면 image 만 지우고 검색·필터는 남긴다
@@ -75,9 +97,7 @@ export function ImageViewerDialog() {
           </DialogClose>
         </div>
         {image.isPending ? (
-          <div className="grid min-h-64 place-items-center">
-            <Spinner className="size-6" />
-          </div>
+          <ViewerSkeleton />
         ) : image.isError ? (
           image.error instanceof ApiClientError && image.error.status === 404 ? (
             <p className="grid min-h-64 place-items-center px-4 text-caption text-muted-foreground">이미지를 찾을 수 없어요</p>

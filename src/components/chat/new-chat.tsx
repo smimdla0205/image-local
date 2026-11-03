@@ -7,10 +7,10 @@ import { toast } from "sonner";
 
 import { Composer, type ComposerSubmit, type ComposerTarget } from "@/components/chat/composer";
 import { ModelPicker } from "@/components/chat/model-picker";
-import { toTarget } from "@/components/chat/target-chip";
+import { TargetChipNotice, TargetChipSkeleton, toTarget } from "@/components/chat/target-chip";
 import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiFetch, errorMessage } from "@/lib/api-client";
+import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId, MODELS } from "@/lib/gpu/models";
 import { type ConversationDetailDto, type ImageDto, parseId } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
@@ -34,8 +34,19 @@ export function NewChat() {
     queryKey: queryKeys.images.detail(linkedId ?? ""),
     queryFn: () => apiFetch<ImageDto>(`/api/images/${linkedId}`),
     enabled: linkedId !== null,
+    // 없는 이미지(404)는 다시 물어도 같다
+    retry: (count, e) => !(e instanceof ApiClientError && e.status === 404) && count < 2,
   });
   const target = manualTarget ?? (linked.data && !linkedDismissed ? toTarget(linked.data) : null);
+  // 고칠 이미지를 받는 동안·못 찾았을 때 칩 자리에 보일 것
+  const linkedSlot =
+    linkedId !== null && !linkedDismissed && !manualTarget ? (
+      linked.isPending ? (
+        <TargetChipSkeleton label="불러오는 중…" />
+      ) : linked.isError ? (
+        <TargetChipNotice message="고칠 이미지를 찾을 수 없어요" onDismiss={() => setLinkedDismissed(true)} />
+      ) : null
+    ) : null;
   // 고칠 이미지가 있으면 고칠 수 없는 모델은 고를 수 없다(이미 골랐다면 고칠 수 있는 모델로 보낸다)
   const selected: ModelId = target && !getModel(model).canEdit ? EDIT_FALLBACK_ID : model;
 
@@ -68,7 +79,7 @@ export function NewChat() {
           <ModelPicker value={selected} onChange={setModel} disabledIds={target ? NON_EDIT_IDS : []} />
           <p className="text-caption text-muted-foreground">모델은 대화를 시작할 때 정해요. 대화 안에서는 바뀌지 않아요.</p>
         </div>
-        <Composer model={selected} mode="new" target={target} onTargetChange={handleTargetChange} onSubmit={handleSubmit} />
+        <Composer model={selected} mode="new" target={target} onTargetChange={handleTargetChange} onSubmit={handleSubmit} targetSlot={linkedSlot} />
       </section>
     </>
   );
@@ -76,14 +87,15 @@ export function NewChat() {
 
 export function NewChatSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-24 pb-16 sm:px-6" aria-hidden="true">
-      <Skeleton className="mx-auto h-9 w-56" />
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="mx-auto flex w-full max-w-205 flex-1 flex-col justify-center gap-6 px-4 pt-24 pb-16 sm:px-6" aria-busy="true">
+      <span className="sr-only">불러오는 중…</span>
+      <Skeleton aria-hidden="true" className="mx-auto h-9 w-56" />
+      <div aria-hidden="true" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
       </div>
-      <Skeleton className="h-32" />
+      <Skeleton aria-hidden="true" className="h-32" />
     </div>
   );
 }

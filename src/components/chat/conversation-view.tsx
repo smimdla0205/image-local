@@ -226,10 +226,11 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
 
 export function ThreadSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-20 pb-6 sm:px-6" aria-hidden="true">
-      <Skeleton className="ml-auto h-10 w-2/3" />
-      <Skeleton className="aspect-square w-full max-w-md" />
-      <Skeleton className="mt-auto h-32" />
+    <div className="mx-auto flex w-full max-w-205 flex-1 flex-col gap-6 px-4 pt-20 pb-6 sm:px-6" aria-busy="true">
+      <span className="sr-only">불러오는 중…</span>
+      <Skeleton aria-hidden="true" className="ml-auto h-10 w-2/3" />
+      <Skeleton aria-hidden="true" className="aspect-square w-full max-w-md" />
+      <Skeleton aria-hidden="true" className="mt-auto h-32" />
     </div>
   );
 }

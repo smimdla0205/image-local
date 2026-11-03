@@ -34,9 +34,10 @@ function Brand() {
 
 function ListSkeleton() {
   return (
-    <div className="flex flex-col gap-2 px-2" aria-hidden="true">
+    <div className="flex flex-col gap-2 px-2" aria-busy="true">
+      <span className="sr-only">불러오는 중…</span>
       {Array.from({ length: 5 }, (_, i) => (
-        <Skeleton key={i} className="h-8" />
+        <Skeleton key={i} aria-hidden="true" className="h-8" />
       ))}
     </div>
   );

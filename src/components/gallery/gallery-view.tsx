@@ -16,17 +16,18 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import { apiFetch } from "@/lib/api-client";
 import { isModelId } from "@/lib/gpu/models";
 import type { ImageDto, ImageListDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
-function GridSkeleton() {
+// 격자 자리. announce: 한 번 낭독할지(더 보기 때는 버튼이 '불러오는 중…' 을 말하므로 끈다)
+function GridSkeleton({ announce = true }: { announce?: boolean }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" aria-hidden="true">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" aria-busy={announce ? "true" : undefined}>
+      {announce && <span className="sr-only">불러오는 중…</span>}
       {Array.from({ length: 8 }, (_, i) => (
-        <Skeleton key={i} className="aspect-square" />
+        <Skeleton key={i} aria-hidden="true" className="aspect-square" />
       ))}
     </div>
   );
@@ -111,17 +112,11 @@ export function GalleryView() {
             <GalleryGrid images={group.items} label={`${group.label} 이미지`} onDelete={setImageToDelete} />
           </section>
         ))}
+        {images.isFetchingNextPage && <GridSkeleton announce={false} />}
         {images.hasNextPage && (
           <div className="flex flex-col items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="max-md:h-11"
-              disabled={images.isFetchingNextPage}
-              aria-busy={images.isFetchingNextPage}
-              onClick={() => void images.fetchNextPage()}
-            >
-              {images.isFetchingNextPage && <Spinner />}더 보기
+            <Button type="button" variant="outline" className="max-md:h-11" disabled={images.isFetchingNextPage} onClick={() => void images.fetchNextPage()}>
+              {images.isFetchingNextPage ? "불러오는 중…" : "더 보기"}
             </Button>
             {images.isFetchNextPageError && <p className="text-caption text-muted-foreground">더 불러오지 못했어요. 다시 눌러 주세요</p>}
           </div>
@@ -144,7 +139,7 @@ export function GalleryView() {
 export function GallerySkeleton() {
   return (
     <div className="flex w-full flex-1 flex-col gap-6 px-4 pt-16 pb-8 sm:px-6">
-      <Skeleton className="h-9 w-80 max-w-full" />
+      <Skeleton aria-hidden="true" className="h-9 w-80 max-w-full" />
       <GridSkeleton />
     </div>
   );

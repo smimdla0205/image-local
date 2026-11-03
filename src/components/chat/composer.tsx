@@ -1,14 +1,14 @@
 "use client";
 
 import { ArrowUpIcon, PaperclipIcon } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type KeyboardEvent, useId, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ComposerOptions, type Count } from "@/components/chat/composer-options";
 import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
 import { RatioMenu } from "@/components/chat/ratio-menu";
 import { StepMeter } from "@/components/chat/step-meter";
-import { type ComposerTarget, TargetChip, toTarget } from "@/components/chat/target-chip";
+import { type ComposerTarget, TargetChip, TargetChipSkeleton, toTarget } from "@/components/chat/target-chip";
 import { Spinner } from "@/components/ui/spinner";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
@@ -26,6 +26,8 @@ type Props = {
   // 실패하면 알림을 띄우고 다시 던진다(입력창은 내용을 그대로 둔다)
   onSubmit: (d: ComposerSubmit) => Promise<void>;
   note?: string;
+  // 고칠 이미지가 없을 때 칩 자리에 대신 둘 것(받는 중 스켈레톤, 못 찾음 알림)
+  targetSlot?: ReactNode;
 };
 
 // 시드: 비우면 무작위, 0~SEED_MAX 정수만
@@ -43,7 +45,7 @@ function placeholderFor(model: ModelId, mode: Props["mode"], hasTarget: boolean)
   return mode === "chat" ? "이어서 만들거나 고칠 내용을 적어 주세요" : "만들고 싶은 이미지를 설명해 주세요";
 }
 
-export function Composer({ model, mode, target, onTargetChange, onSubmit, note }: Props) {
+export function Composer({ model, mode, target, onTargetChange, onSubmit, note, targetSlot }: Props) {
   const spec = getModel(model);
   const promptId = useId();
   const noteId = useId();
@@ -123,7 +125,7 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
         onSubmit={handleSubmit}
         className="flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-composer focus-within:border-input"
       >
-        {target && <TargetChip target={target} onRemove={() => onTargetChange(null)} />}
+        {uploading ? <TargetChipSkeleton label="올리는 중…" /> : target ? <TargetChip target={target} onRemove={() => onTargetChange(null)} /> : targetSlot}
         <label htmlFor={promptId} className="sr-only">
           {target ? "어떻게 고칠지" : "프롬프트"}
         </label>
@@ -147,7 +149,7 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note }
             onClick={() => fileRef.current?.click()}
             className={ICON_BUTTON_CLASS}
           >
-            {uploading ? <Spinner className="size-4" /> : <PaperclipIcon aria-hidden="true" className="size-[18px]" />}
+            <PaperclipIcon aria-hidden="true" className="size-[18px]" />
           </button>
           {target ? <span className="px-1 text-caption text-muted-foreground">원본 비율</span> : <RatioMenu value={ratio} onChange={setRatio} />}
           <ComposerOptions
