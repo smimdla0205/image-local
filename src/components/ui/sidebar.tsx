@@ -44,6 +44,9 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
+// html[data-sidebar] 는 토글할 때 이 컴포넌트가 직접 지우고 다시 그리므로 따로 구독할 것이 없다
+const subscribeNoop = () => () => {}
+
 function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
@@ -72,10 +75,18 @@ function SidebarProvider({
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
-  const open = openProp ?? _open
+  // 쿠키로 접어 둔 첫 페인트(layout.tsx 의 인라인 스크립트가 html[data-sidebar] 에 올린다). 서버 HTML 은 펼침이라
+  // 외부 스냅숏으로 읽어 hydration 뒤에만 반영한다. 사용자가 토글하면 속성을 지워 상태만 따른다
+  const restoredCollapsed = React.useSyncExternalStore(
+    subscribeNoop,
+    () => document.documentElement.dataset.sidebar === "collapsed",
+    () => false
+  )
+  const open = openProp ?? (restoredCollapsed ? false : _open)
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value
+      delete document.documentElement.dataset.sidebar
       if (setOpenProp) {
         setOpenProp(openState)
       } else {
@@ -132,7 +143,8 @@ function SidebarProvider({
         data-slot="sidebar-wrapper"
         style={
           {
-            "--sidebar-width": SIDEBAR_WIDTH,
+            // 저장된 너비(인라인 스크립트가 html 에 둔 --sidebar-width-user)가 있으면 그것, 없으면 기본값
+            "--sidebar-width": `var(--sidebar-width-user, ${SIDEBAR_WIDTH})`,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties

@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   description: "오픈소스 이미지 모델 채팅",
 };
 
+// hydration 전에 쿠키(sidebar_state·sidebar_width)로 사이드바 접힘·너비를 html 에 올려 첫 페인트부터 맞춘다.
+// 접힘은 SidebarProvider 가 상태를 맞춘 뒤 속성을 지우고, 너비 변수는 그대로 쓴다. 고정 문자열이라 dangerouslySetInnerHTML 로 넣는다
+const SIDEBAR_RESTORE_SCRIPT = `(function(){try{var c=document.cookie;if(/(?:^|; )sidebar_state=false(?:;|$)/.test(c))document.documentElement.dataset.sidebar="collapsed";var m=c.match(/(?:^|; )sidebar_width=([0-9.]+)/);if(m){var n=Math.min(24,Math.max(12,parseFloat(m[1])));if(!isNaN(n))document.documentElement.style.setProperty("--sidebar-width-user",n+"rem")}}catch(e){}})()`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // next-themes 가 html 의 class 를 바꾸므로 이 요소만 hydration 경고에서 뺀다
@@ -26,6 +30,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${inter.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SIDEBAR_RESTORE_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>
           <AppShell>{children}</AppShell>

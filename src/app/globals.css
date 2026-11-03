@@ -194,6 +194,15 @@
   background: repeating-conic-gradient(var(--color-muted) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
 }
 
+/* hydration 전 사이드바 접힘: layout.tsx 의 인라인 스크립트가 쿠키를 읽어 html 에 올린다. 서버 HTML 은 펼침이라
+   여기서 먼저 접어 두고, SidebarProvider 가 상태를 맞춘 뒤 속성을 지운다(값이 같아 다시 움직이지 않는다) */
+html[data-sidebar="collapsed"] [data-slot="sidebar-gap"] {
+  width: 0;
+}
+html[data-sidebar="collapsed"] [data-slot="sidebar-container"][data-side="left"] {
+  left: calc(var(--sidebar-width) * -1);
+}
+
 /* 이미지를 받는 동안: 이미지는 투명하고 자리(.image-frame, muted)는 은은하게 깜빡인다. 다 받으면 짧게 나타난다(FadeImage).
    깜빡임은 틀 위 의사 요소의 opacity 로 해 합성 단계에서 돈다(화면 밖 지연 로딩 틀이 많아도 가볍다).
    한 틀의 이미지는 모두 받은 뒤 함께 보인다(비교 슬라이더처럼 겹친 두 장). 움직임 줄이기면 바로 바꾼다 */
