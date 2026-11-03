@@ -123,7 +123,7 @@ export function Composer({ model, mode, target, onTargetChange, onSubmit, note, 
         ref={formRef}
         aria-label="이미지 생성"
         onSubmit={handleSubmit}
-        className="flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-composer focus-within:border-input"
+        className="flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-composer focus-within:shadow-focus-ring"
       >
         {uploading ? <TargetChipSkeleton label="올리는 중…" /> : target ? <TargetChip target={target} onRemove={() => onTargetChange(null)} /> : targetSlot}
         <label htmlFor={promptId} className="sr-only">

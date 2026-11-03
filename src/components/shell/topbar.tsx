@@ -2,7 +2,7 @@
 
 import { LockIcon, SquarePenIcon } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { getModel, type ModelId } from "@/lib/gpu/models";
@@ -12,10 +12,18 @@ const ICON_CLASS = "max-md:size-11";
 // 화면 상단. 모바일은 메뉴(사이드바 시트)와 새 대화, 데스크톱은 사이드바를 접었을 때만 여는 버튼을 보인다
 export function Topbar({ title, hideTitle = false, model, actions }: { title: string; hideTitle?: boolean; model?: ModelId; actions?: ReactNode }) {
   const { state } = useSidebar();
+  const openButton = useRef<HTMLButtonElement>(null);
+  // 사이드바를 접으면(접기 버튼이 inert 가 되어 포커스를 잃는다) 포커스를 열기 버튼으로 옮긴다. 처음부터 접힌 채 열릴 때는 옮기지 않는다
+  const prevState = useRef(state);
+  useEffect(() => {
+    const collapsedNow = prevState.current === "expanded" && state === "collapsed";
+    prevState.current = state;
+    if (collapsedNow) openButton.current?.focus();
+  }, [state]);
   return (
     <header className="sticky top-0 z-10 flex min-h-14 items-center gap-2 bg-background px-4 py-2">
       <SidebarTrigger aria-label="메뉴 열기" className={`md:hidden ${ICON_CLASS}`} />
-      {state === "collapsed" && <SidebarTrigger aria-label="사이드바 열기" className="max-md:hidden" />}
+      {state === "collapsed" && <SidebarTrigger ref={openButton} aria-label="사이드바 열기" className="max-md:hidden" />}
       <h1 className={hideTitle ? "sr-only" : "min-w-0 truncate text-base font-semibold"}>{title}</h1>
       {model && (
         <span className="inline-flex shrink-0 items-center gap-1 text-caption text-muted-foreground" title="이 대화의 모델이에요. 다른 모델은 새 대화에서 골라요.">

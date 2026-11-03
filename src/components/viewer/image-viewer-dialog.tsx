@@ -14,6 +14,7 @@ import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { promptAlt } from "@/lib/jobs/constants";
 import { findImage } from "@/lib/jobs/find-image";
 import { type ConversationDetailDto, type ImageDto, type ImageListDto, parseId } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
@@ -113,7 +114,7 @@ export function ImageViewerDialog() {
             >
               <FadeImage
                 src={image.data.previewUrl}
-                alt={image.data.prompt ?? "올린 사진"}
+                alt={promptAlt(image.data.prompt)}
                 width={image.data.width}
                 height={image.data.height}
                 fetchPriority="high"

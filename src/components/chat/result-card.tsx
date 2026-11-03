@@ -15,6 +15,7 @@ import { ViewerLink } from "@/components/viewer/viewer-link";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { getModel, type ModelId } from "@/lib/gpu/models";
+import { promptAlt } from "@/lib/jobs/constants";
 import type { ImageDto, JobDto } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 
@@ -53,14 +54,14 @@ function TileActions({ image, model, onEdit, onDelete }: { image: ImageDto; mode
   );
 }
 
-function ImageTile({ image, model, onEdit, onDelete }: { image: ImageDto; model: ModelId } & TileHandlers) {
+function ImageTile({ image, model, pos, onEdit, onDelete }: { image: ImageDto; model: ModelId; pos: { n: number; total: number } } & TileHandlers) {
   return (
     <figure className="image-frame group relative m-0 overflow-hidden rounded-md bg-muted">
       {/* 이미지를 눌러도 크게 본다(키보드는 '크게 보기' 버튼). 이미지를 링크 안에 두어 저장·복사 메뉴와 끌어 놓기는 그대로 된다 */}
       <ViewerLink href={`?image=${image.id}`} tabIndex={-1} className="block cursor-zoom-in">
         <FadeImage
           src={image.previewUrl}
-          alt={image.prompt ?? ""}
+          alt={promptAlt(image.prompt, pos)}
           width={image.width}
           height={image.height}
           loading="lazy"
@@ -150,9 +151,9 @@ export const ResultCard = memo(function ResultCard({ jobs, model, onEdit, onRege
       ) : (
         succeeded.length > 0 && (
           <div className={cn("grid gap-2", succeeded.length > 1 ? "grid-cols-2" : "max-w-md grid-cols-1")}>
-            {succeeded.map((j) =>
+            {succeeded.map((j, i) =>
               j.image ? (
-                <ImageTile key={j.id} image={j.image} model={model} onEdit={onEdit} onDelete={onDelete} />
+                <ImageTile key={j.id} image={j.image} model={model} pos={{ n: i + 1, total: succeeded.length }} onEdit={onEdit} onDelete={onDelete} />
               ) : (
                 <DeletedImage key={j.id} width={j.width} height={j.height} size="tile" />
               ),

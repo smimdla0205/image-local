@@ -28,7 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="ko"
       suppressHydrationWarning
-      className={`${inter.variable} h-full antialiased`}
+      // scroll-pt/pb: 고정된 상단 바(56px)와 아래 입력창이 포커스된 요소를 가리지 않게 한다
+      className={`${inter.variable} h-full scroll-pt-16 scroll-pb-32 antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: SIDEBAR_RESTORE_SCRIPT }} />

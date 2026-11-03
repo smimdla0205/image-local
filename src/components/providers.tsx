@@ -45,7 +45,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         {/* 디자인 시스템 아이콘 규칙: Lucide 선 굵기 1.75. 아이콘에 strokeWidth 를 직접 주면 그 값이 우선한다 */}
         <LucideProvider strokeWidth={1.75}>
           <TooltipProvider>{children}</TooltipProvider>
-          <Toaster />
+          <Toaster containerAriaLabel="알림" />
         </LucideProvider>
       </ThemeProvider>
       <ReactQueryDevtools />
