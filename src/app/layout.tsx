@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import localFont from "next/font/local";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/shell/app-shell";
+// Pretendard 가변 글꼴의 공식 dynamic subset(1.3.9, SIL OFL 1.1 — 원문은 같은 폴더의 Pretendard-OFL.txt).
+// 글자 범위별 조각(92개)이라 브라우저는 화면에 쓰인 글자가 든 조각만 받는다
+import "./fonts/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
-// 디자인 시스템 글꼴. globals.css 의 --font-sans 가 Inter, Pretendard 순서로 쌓아 영문·숫자는 Inter, 한글은 Pretendard 로 그린다
+// 디자인 시스템 글꼴. globals.css 의 --font-sans 가 Inter, Pretendard Variable 순서로 쌓아 영문·숫자는 Inter, 한글은 Pretendard 로 그린다
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-});
-
-// Pretendard 가변 글꼴. SIL OFL 1.1 이고 원문은 같은 폴더의 Pretendard-OFL.txt
-const pretendard = localFont({
-  src: "./fonts/PretendardVariable.woff2",
-  weight: "45 920",
-  variable: "--font-pretendard",
 });
 
 export const metadata: Metadata = {
@@ -29,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="ko"
       suppressHydrationWarning
-      className={`${inter.variable} ${pretendard.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>

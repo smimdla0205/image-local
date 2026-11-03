@@ -117,7 +117,7 @@ imagen-local/
 - **`turbopack.root` 를 이 폴더로 고정했다.** 상위 작업공간에도 `package-lock.json` 이 있어 자동 감지가 그쪽을 루트로 잡는다.
 - **shadcn 은 Base UI 기반 `base-nova` 스타일이다.** `cn()` 은 shadcn 이 관리하는 `cn` 패키지에서 온다.
 - **색·반경·그림자·글자 스타일은 디자인 시스템 토큰이다.** `src/app/globals.css` 의 shadcn 변수에 연결돼 있고, 디자인 시스템 링크는 `CLAUDE.md` 에 있다.
-- **글꼴은 Inter 와 Pretendard 다.** Inter 는 `next/font/google`, Pretendard 는 `src/app/fonts/` 의 가변 글꼴을 `next/font/local` 로 불러온다. Pretendard 는 SIL OFL 1.1 이고 원문을 같은 폴더에 둔다.
+- **글꼴은 Inter 와 Pretendard 다.** Inter 는 `next/font/google` 로, Pretendard 는 `src/app/fonts/` 의 공식 가변 글꼴 dynamic subset(CSS 하나와 글자 범위별 woff2 조각 92개)을 `layout.tsx` 에서 CSS 로 불러온다. 브라우저는 화면에 쓰인 글자가 든 조각만 받는다. 조각은 공식 배포판 파일 그대로 두고 손대지 않는다(OFL 의 예약 글꼴 이름 때문에 직접 잘라 쓰면 이름을 바꿔야 한다). Pretendard 는 SIL OFL 1.1 이고 원문을 같은 폴더에 둔다.
 - **`src/hooks/use-mobile.ts` 는 shadcn 원본과 다르다.** `useSyncExternalStore` 로 구현돼 lint 를 통과하므로 `shadcn add --overwrite` 로 덮지 않는다.
 - **npm 설치 스크립트 승인.** `package.json` 의 `allowScripts` 에 better-sqlite3(네이티브 바인딩), prisma, @prisma/engines(스키마 엔진)가 버전 고정으로 들어 있다. 이 패키지를 올리면 `npm install-scripts approve <패키지>` 로 다시 승인한다.
 - **SQLite 파일은 앱 폴더의 `dev.db` 다.** Prisma CLI 와 앱이 같은 `DATABASE_URL` 로 같은 파일을 쓴다.
