@@ -99,6 +99,7 @@ export function ImageViewerDialog() {
                 width={image.data.width}
                 height={image.data.height}
                 decoding="async"
+                fetchPriority="high"
                 className={cn("block h-auto max-h-[70dvh] w-full rounded-md object-contain", image.data.hasAlpha && "checker")}
               />
             </div>

@@ -166,20 +166,22 @@
   html {
     @apply font-sans;
   }
-  /* 누를 수 있는 버튼은 손가락 커서다(Tailwind 4 는 버튼에 기본 화살표를 둔다). 비활성 버튼은 그대로 둔다 */
+  /* 누를 수 있는 버튼·스위치는 손가락 커서다(Tailwind 4 는 버튼에 기본 화살표를 둔다). 비활성은 그대로 둔다 */
   button:not(:disabled):not([aria-disabled="true"]),
-  [role="button"]:not([aria-disabled="true"]) {
+  [role="button"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
 }
 
-/* 이미지 위 액션 버튼: 마우스는 hover·포커스 때, 터치 기기(hover 없음)는 항상 보인다 */
+/* 이미지 위 액션 버튼: 마우스는 hover 때, 키보드는 포커스가 들어왔을 때, 터치 기기(hover 없음)는 항상 보인다.
+   마우스로 연 뷰어를 닫아 포커스가 이미지로 돌아와도 키보드 포커스가 아니면 숨는다(:focus-visible) */
 .hover-actions {
   opacity: 0;
   transition: opacity 120ms ease-out;
 }
 .group:hover .hover-actions,
-.group:focus-within .hover-actions {
+.group:has(:focus-visible) .hover-actions {
   opacity: 1;
 }
 @media (hover: none) {
@@ -223,13 +225,18 @@ img[data-loading] {
   background-color: var(--muted);
   background-image: var(--thumb);
 }
+/* 썸네일 위에서는 페이드하지 않고 바로 바꾼다(페이드하는 동안 썸네일이 걷혀 빈 바탕이 비친다) */
+.thumb-under .fade-image {
+  transition: none;
+}
 @keyframes image-loading {
   50% {
     opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fade-image {
+  .fade-image,
+  .hover-actions {
     transition: none;
   }
   .image-frame:has(img[data-loading])::before {

@@ -71,7 +71,8 @@ export function GalleryView() {
   let content: React.ReactNode;
   // 이전 결과가 비어 있었으면 새 결과를 받는 동안 '없음' 대신 자리표시를 보인다(받기 전에 결과 없음을 보이지 않는다)
   if (images.isPending || (images.isPlaceholderData && items.length === 0)) content = <GridSkeleton />;
-  else if (images.isError) content = <p className="py-16 text-center text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
+  // 받은 목록이 있으면(다음 페이지만 실패) 격자를 남기고 '더 보기' 옆에서 알린다
+  else if (images.isError && !images.data) content = <p className="py-16 text-center text-caption text-muted-foreground">목록을 불러오지 못했어요</p>;
   else if (items.length === 0) content = <p className="py-16 text-center text-caption text-muted-foreground">{filtered ? "찾는 이미지가 없어요" : "아직 만든 이미지가 없어요"}</p>;
   else
     content = (
@@ -83,16 +84,19 @@ export function GalleryView() {
           </section>
         ))}
         {images.hasNextPage && (
-          <Button
-            type="button"
-            variant="outline"
-            className="mx-auto max-md:h-11"
-            disabled={images.isFetchingNextPage}
-            aria-busy={images.isFetchingNextPage}
-            onClick={() => void images.fetchNextPage()}
-          >
-            {images.isFetchingNextPage && <Spinner aria-label="불러오는 중" />}더 보기
-          </Button>
+          <div className="flex flex-col items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="max-md:h-11"
+              disabled={images.isFetchingNextPage}
+              aria-busy={images.isFetchingNextPage}
+              onClick={() => void images.fetchNextPage()}
+            >
+              {images.isFetchingNextPage && <Spinner />}더 보기
+            </Button>
+            {images.isFetchNextPageError && <p className="text-caption text-muted-foreground">더 불러오지 못했어요. 다시 눌러 주세요</p>}
+          </div>
         )}
       </div>
     );
