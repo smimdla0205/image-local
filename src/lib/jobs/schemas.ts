@@ -3,17 +3,11 @@ import { z } from "zod";
 
 import { MODEL_IDS, type ModelId } from "../gpu/models";
 import { type Ratio, RATIOS } from "../gpu/sizes";
+import { DETAIL_JOB_LIMIT, ID_RE, PROMPT_MAX, SEED_MAX } from "./constants";
 
 export type { ModelId, Ratio };
-
-export const SEED_MAX = 2_147_483_647;
-export const PROMPT_MAX = 4000;
-
-// 쿼리스트링의 id 형식(소문자·숫자). 형식이 다르면 null
-export const ID_RE = /^[a-z0-9]+$/;
-export function parseId(raw: string | null): string | null {
-  return raw && ID_RE.test(raw) ? raw : null;
-}
+// 서버 코드는 여기서 같이 가져간다. 클라이언트 컴포넌트는 zod 가 딸려오지 않게 constants 에서 직접 가져온다
+export { DETAIL_JOB_LIMIT, ID_RE, parseId, PROMPT_MAX, SEED_MAX } from "./constants";
 
 export const modelIdSchema = z.enum(MODEL_IDS);
 export const ratioSchema = z.enum(RATIOS);
@@ -49,8 +43,6 @@ export const purgeBodySchema = z.object({
   before: z.iso.datetime().optional(),
 });
 
-// 대화 상세에 싣는 최근 잡 수(그보다 오래된 잡은 화면에 오르지 않는다). 진행 중 잡 GET 이 한 번에 물을 수 있는 수도 같다
-export const DETAIL_JOB_LIMIT = 100;
 // GET /api/conversations/[id]/jobs?ids=a,b — 물을 잡 id 를 쉼표로 잇는다
 export const jobIdsQuerySchema = z.object({
   ids: z

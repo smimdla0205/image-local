@@ -5,7 +5,7 @@ import { ChevronDownIcon, RectangleHorizontalIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { type Ratio, RATIOS } from "@/lib/gpu/sizes";
 
-export const CHIP_CLASS =
+const CHIP_CLASS =
   "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border bg-card pr-2.5 pl-2 text-caption font-medium whitespace-nowrap transition-colors outline-none hover:bg-secondary focus-visible:shadow-focus-ring aria-expanded:bg-secondary max-md:h-11";
 
 // 입력창 바의 비율 칩. 고칠 이미지가 있으면 쓰지 않는다(그때는 원본 비율)

@@ -13,7 +13,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import type { Ratio } from "@/lib/gpu/sizes";
-import { type ImageDto, PROMPT_MAX, SEED_MAX } from "@/lib/jobs/schemas";
+import { PROMPT_MAX, SEED_MAX } from "@/lib/jobs/constants";
+import type { ImageDto } from "@/lib/jobs/schemas";
 
 export type { ComposerTarget };
 export type ComposerSubmit = { prompt: string; ratio: Ratio; count: Count; seed?: number; transparent: boolean; inputImageId?: string };

@@ -7,7 +7,7 @@ import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { SEED_MAX } from "@/lib/jobs/schemas";
+import { SEED_MAX } from "@/lib/jobs/constants";
 
 import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
 

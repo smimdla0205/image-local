@@ -12,7 +12,8 @@ import { Topbar } from "@/components/shell/topbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId, MODELS } from "@/lib/gpu/models";
-import { type ConversationDetailDto, type ImageDto, parseId } from "@/lib/jobs/schemas";
+import { parseId } from "@/lib/jobs/constants";
+import type { ConversationDetailDto, ImageDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
 // 모델 표에서 뽑는다: 고치기를 못 하는 모델 id 와, 고칠 이미지가 있을 때 바꿔 보낼 모델(고칠 수 있는 첫 모델)

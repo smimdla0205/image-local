@@ -14,9 +14,9 @@ import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ViewerPanel } from "@/components/viewer/viewer-panel";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
-import { promptAlt } from "@/lib/jobs/constants";
+import { parseId, promptAlt } from "@/lib/jobs/constants";
 import { findImage } from "@/lib/jobs/find-image";
-import { type ConversationDetailDto, type ImageDto, type ImageListDto, parseId } from "@/lib/jobs/schemas";
+import type { ConversationDetailDto, ImageDto, ImageListDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
 
 // 캐시에 있는 갤러리 목록과 대화 상세에서 같은 id 의 이미지를 찾는다

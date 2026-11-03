@@ -18,7 +18,8 @@ import { ApiClientError, apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { ratioFromSize } from "@/lib/gpu/sizes";
 import { findImage } from "@/lib/jobs/find-image";
-import { type ConversationDetailDto, type ImageDto, type JobDto, type JobsDto, parseId } from "@/lib/jobs/schemas";
+import { parseId } from "@/lib/jobs/constants";
+import type { ConversationDetailDto, ImageDto, JobDto, JobsDto } from "@/lib/jobs/schemas";
 import { isActive } from "@/lib/jobs/transitions";
 import { queryKeys } from "@/lib/query-keys";
 
