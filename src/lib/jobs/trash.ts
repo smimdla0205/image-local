@@ -51,12 +51,15 @@ export async function trashImage(id: string): Promise<Trashed | null> {
   return { id, deletedAt: now };
 }
 
-// 대화가 휴지통에 있으면 이미지만 먼저 돌릴 수 없다(대화를 복구하면 같이 돌아온다)
+// 대화가 휴지통에 있으면 이미지만 먼저 돌릴 수 없다(대화를 복구하면 같이 돌아온다).
+// 대화 확인과 복구를 한 트랜잭션에서 해, 그 사이 대화가 휴지통으로 가도 이미지만 살아나지 않게 한다
 export async function restoreImage(id: string): Promise<Image | null> {
-  const image = await prisma.image.findUnique({ where: { id }, select: { conversation: { select: { deletedAt: true } } } });
-  if (!image) return null;
-  if (image.conversation?.deletedAt) throw new ApiError(409, "conversation_in_trash");
-  return prisma.image.update({ where: { id }, data: { deletedAt: null } });
+  return prisma.$transaction(async (tx) => {
+    const image = await tx.image.findUnique({ where: { id }, select: { conversation: { select: { deletedAt: true } } } });
+    if (!image) return null;
+    if (image.conversation?.deletedAt) throw new ApiError(409, "conversation_in_trash");
+    return tx.image.update({ where: { id }, data: { deletedAt: null } });
+  });
 }
 
 const TRASH_LIST_LIMIT = 200;
@@ -134,11 +137,17 @@ export async function purgeTrash(opts: PurgeOptions): Promise<{ conversations: n
   return { conversations: conversations.length, images: fileIds.length };
 }
 
-// 대화에 붙지 않은 채 오래된 업로드(칩에서 뺐거나 보내지 않은 사진)를 지운다
+// 대화에 붙지 않은 채 오래된 업로드(칩에서 뺐거나 보내지 않은 사진)를 지운다.
+// 고르기와 지우기를 한 트랜잭션에서 해, 그 사이 요청에 붙은(createJobs 가 대화로 귀속한) 업로드는 건드리지 않는다. 파일은 지운 행 것만 지운다
 export async function purgeStaleUploads(now = new Date()): Promise<number> {
-  const rows = await prisma.image.findMany({ where: { kind: "UPLOADED", conversationId: null, createdAt: { lt: staleUploadCutoff(now) } }, select: { id: true } });
-  if (rows.length === 0) return 0;
-  await prisma.image.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  const where: Prisma.ImageWhereInput = { kind: "UPLOADED", conversationId: null, createdAt: { lt: staleUploadCutoff(now) } };
+  // 쓰기 요청마다 도므로 지울 것이 없으면 트랜잭션을 열지 않는다(purgeTrash 와 같음)
+  if (!(await prisma.image.findFirst({ where, select: { id: true } }))) return 0;
+  const rows = await prisma.$transaction(async (tx) => {
+    const stale = await tx.image.findMany({ where, select: { id: true } });
+    if (stale.length > 0) await tx.image.deleteMany({ where: { id: { in: stale.map((r) => r.id) } } });
+    return stale;
+  });
   await Promise.all(rows.map((r) => deleteImageFiles(r.id)));
   return rows.length;
 }

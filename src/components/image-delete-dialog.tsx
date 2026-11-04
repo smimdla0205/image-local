@@ -68,6 +68,8 @@ export function ImageDeleteDialog({ image, onOpenChange, onDeleted }: Props) {
     setBusy(false);
     onOpenChange(false);
     onDeleted?.(imageId);
+    // 단건 캐시는 버린다(남아 있으면 주소로 다시 열 때 지운 이미지가 보인다). 다시 받지는 않으므로 404 가 나지 않는다
+    queryClient.removeQueries({ queryKey: queryKeys.images.detail(imageId) });
     invalidateAfterTrash(queryClient);
     toast.success("휴지통으로 옮겼어요", { action: { label: "되돌리기", onClick: () => void restore(imageId) } });
   }

@@ -37,7 +37,8 @@ const GalleryTile = memo(function GalleryTile({ img, order, onDelete }: { img: I
         {spec && <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{spec.shortName}</span>}
         <span className="rounded-sm bg-overlay px-1.5 py-0.5 text-micro text-overlay-foreground">{img.kind === "EDITED" ? "이어서 고치기" : "텍스트→이미지"}</span>
       </div>
-      <div className="hover-actions absolute top-2 right-2 flex gap-1">
+      {/* 좁은 타일(모바일 2열)에서는 버튼이 한 줄에 다 들어가지 않아 타일 안에서 줄을 바꾼다 */}
+      <div className="hover-actions absolute top-2 right-2 flex max-w-[calc(100%-1rem)] flex-wrap justify-end gap-1">
         <ViewerLink imageId={img.id} aria-label="크게 보기" className={FLOAT_CLASS}>
           <Maximize2Icon aria-hidden="true" className="size-4" />
         </ViewerLink>

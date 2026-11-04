@@ -31,7 +31,8 @@ type TileHandlers = Pick<Handlers, "onEdit" | "onDelete">;
 // 이미지 위 액션: 크게 보기 · 이어서 고치기(MOSS 는 다른 모델로 고치기) · 다운로드 · 삭제
 function TileActions({ image, model, onEdit, onDelete }: { image: ImageDto; model: ModelId } & TileHandlers) {
   return (
-    <div className="hover-actions absolute top-2 right-2 flex gap-1">
+    // 좁은 카드(모바일 2열)에서는 버튼이 한 줄에 다 들어가지 않아 카드 안에서 줄을 바꾼다
+    <div className="hover-actions absolute top-2 right-2 flex max-w-[calc(100%-1rem)] flex-wrap justify-end gap-1">
       <ViewerLink imageId={image.id} aria-label="크게 보기" className={FLOAT_CLASS}>
         <Maximize2Icon aria-hidden="true" className="size-4" />
       </ViewerLink>

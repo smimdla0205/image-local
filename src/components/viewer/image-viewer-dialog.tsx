@@ -80,12 +80,11 @@ export function ImageViewerDialog() {
     window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
   }
 
-  // 삭제 확인창(공용). 지우면 뷰어를 닫고, 지운 id 의 캐시는 주소가 바뀐 뒤 버린다
+  // 삭제 확인창(공용). 지우면 뷰어를 닫는다(지운 id 의 캐시는 확인창이 버린다)
   const [deleting, setDeleting] = useState<ImageDto | null>(null);
   function handleDeleted(removedId: string) {
     setDeletedId(removedId);
     close();
-    queryClient.removeQueries({ queryKey: queryKeys.images.detail(removedId) });
   }
 
   return (

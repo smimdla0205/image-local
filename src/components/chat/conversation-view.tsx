@@ -60,7 +60,11 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
       const byId = new Map(synced.jobs.map((j) => [j.id, j]));
       const jobs = current.jobs.map((j) => byId.get(j.id) ?? j);
       if (!jobs.some((j) => isActive(j.status))) return fetchDetail();
-      return { ...current, jobs, worker: synced.worker };
+      // 삭제 확인창의 수도 합친 잡에 맞춘다(끝난 잡은 진행 중에서 빼고, 새로 나온 이미지는 더한다)
+      const finished = jobs.filter((j, i) => isActive(current.jobs[i].status) && !isActive(j.status)).length;
+      const appeared = jobs.filter((j, i) => j.image && !current.jobs[i].image).length;
+      const counts = { ...current.counts, activeJobs: current.counts.activeJobs - finished, images: current.counts.images + appeared };
+      return { ...current, jobs, worker: synced.worker, counts };
     },
     initialData,
     initialDataUpdatedAt: () => Date.now(),
@@ -138,8 +142,8 @@ export function ConversationView({ id, initialData }: { id: string; initialData:
     async (body: Omit<ComposerSubmit, "count"> & { count: number }) => {
       const created = await apiFetch<JobsDto>(`/api/conversations/${id}/jobs`, { method: "POST", json: body });
       queryClient.setQueryData<ConversationDetailDto>(queryKeys.conversations.detail(id), (old) =>
-        // 접수는 응답 뒤라 응답의 worker 는 아직 모르는 값이다. 캐시의 값을 두고 다음 폴링이 바꾼다
-        old ? { ...old, jobs: [...old.jobs, ...created.jobs] } : old,
+        // 접수는 응답 뒤라 응답의 worker 는 아직 모르는 값이다. 캐시의 값을 두고 다음 폴링이 바꾼다. 새 잡은 진행 중 수에 더한다(삭제 확인창)
+        old ? { ...old, jobs: [...old.jobs, ...created.jobs], counts: { ...old.counts, activeJobs: old.counts.activeJobs + created.jobs.length } } : old,
       );
       // 상세는 위에서 바로 채웠고 진행 중인 잡이 있으면 폴링이 다시 불러오므로 목록만 새로 받는다
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
