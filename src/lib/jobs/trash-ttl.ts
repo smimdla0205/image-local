@@ -10,6 +10,11 @@ export function trashExpiresAt(deletedAt: Date): Date {
   return new Date(deletedAt.getTime() + TRASH_TTL_DAYS * DAY_MS);
 }
 
+// 자동으로 지워질 때까지 남은 날. 당일은 0
+export function trashDaysLeft(expiresAt: Date | string, now: Date): number {
+  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now.getTime()) / DAY_MS));
+}
+
 // 이 시각보다 먼저 휴지통에 들어간 항목은 지운다
 export function trashCutoff(now: Date): Date {
   return new Date(now.getTime() - TRASH_TTL_DAYS * DAY_MS);

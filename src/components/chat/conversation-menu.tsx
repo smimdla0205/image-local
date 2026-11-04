@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ICON_BUTTON_CLASS } from "@/components/chat/styles";
+import { Fact } from "@/components/fact";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import type { ConversationDetailDto, ConversationListDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
+import { restoreFromTrash } from "@/lib/trash-client";
 
 type Props = {
   id: string;
@@ -30,17 +32,6 @@ type Props = {
   onDeletingChange: (deleting: boolean) => void;
 };
 
-function Fact({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-2">
-      <span aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground [&_svg]:size-4">
-        {icon}
-      </span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
 // 대화 메뉴: 대화 삭제(확인 뒤 휴지통으로. 토스트의 되돌리기로 바로 복구)
 export function ConversationMenu({ id, title, counts, onDeletingChange }: Props) {
   const router = useRouter();
@@ -48,6 +39,7 @@ export function ConversationMenu({ id, title, counts, onDeletingChange }: Props)
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // 대화를 옮기면 그 이미지도 가므로 이미지 단건까지 새로 받는다(지운 상세·이미지 캐시는 아래서 버린다)
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list() });
     void queryClient.invalidateQueries({ queryKey: queryKeys.images.all });
@@ -56,7 +48,7 @@ export function ConversationMenu({ id, title, counts, onDeletingChange }: Props)
 
   async function restore() {
     try {
-      await apiFetch(`/api/conversations/${id}/restore`, { method: "POST" });
+      await restoreFromTrash("conversation", id);
       invalidate();
       toast.success("복구했어요");
       router.push(`/c/${id}`);

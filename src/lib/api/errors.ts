@@ -97,10 +97,14 @@ export function handleRoute(name: string, fn: RouteFn): RouteFn {
       if (err instanceof ApiError) return jsonError(err.status, err.code, err.message);
       // zod 의 영문 메시지는 싣지 않는다
       if (err instanceof ZodError) return jsonError(400, "invalid_request");
-      // message·stack 은 남기지 않는다(Prisma 메시지에 프롬프트가 섞일 수 있다)
-      const e = err as { name?: unknown; code?: unknown };
-      console.error("[api]", name, e?.name, e?.code);
+      logErrorKind("[api]", err, name);
       return jsonError(500, "internal_error");
     }
   };
+}
+
+// 오류는 이름·코드만 남긴다(message·stack 에 프롬프트·경로가 섞일 수 있다). id 는 잡·라우트 이름 같은 짧은 식별자
+export function logErrorKind(tag: string, e: unknown, id?: string): void {
+  const err = e as { name?: unknown; code?: unknown } | null;
+  console.error(tag, ...(id === undefined ? [] : [id]), err?.name, err?.code);
 }

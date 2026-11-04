@@ -11,11 +11,13 @@ import { syncJobs } from "@/lib/jobs/sync";
 export const GET = handleRoute("jobs.sync", async (req, ctx) => {
   const { id } = await ctx.params;
   const { ids } = jobIdsQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
-  const jobs = await prisma.job.findMany({ where: { conversationId: id, id: { in: ids } }, include: jobInclude });
-  // 대화가 있는지는 맞는 잡이 없을 때만 따로 본다(폴링마다 한 번 더 묻지 않게)
+  const jobs = await prisma.job.findMany({ where: { conversationId: id, id: { in: ids } }, include: { ...jobInclude, conversation: { select: { deletedAt: true } } } });
+  // 대화가 있는지는 맞는 잡이 없을 때만 따로 본다(폴링마다 한 번 더 묻지 않게). 휴지통 대화는 없는 것으로 본다
   if (jobs.length === 0) {
-    const conversation = await prisma.conversation.findUnique({ where: { id }, select: { id: true } });
-    if (!conversation) throw new ApiError(404, "conversation_not_found");
+    const conversation = await prisma.conversation.findUnique({ where: { id }, select: { deletedAt: true } });
+    if (!conversation || conversation.deletedAt) throw new ApiError(404, "conversation_not_found");
+  } else if (jobs[0].conversation.deletedAt) {
+    throw new ApiError(404, "conversation_not_found");
   }
   const synced = await syncJobs(jobs);
   return Response.json({ jobs: synced.jobs.map(toJobDto), worker: synced.worker });

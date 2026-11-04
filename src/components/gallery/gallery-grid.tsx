@@ -65,7 +65,7 @@ const GalleryTile = memo(function GalleryTile({ img, order, onDelete }: { img: I
 
 // 갤러리 타일 격자. 크게 보기는 지금 검색·필터를 남긴 채 ?image= 를 붙인다. 삭제는 공용 확인창을 연다.
 // startIndex: 날짜 묶음이 여럿이라 전체 목록에서 이 격자가 시작하는 순번(이미지 우선순위 계산)
-export function GalleryGrid({ images, label, startIndex = 0, onDelete }: { images: ImageDto[]; label: string; startIndex?: number; onDelete: (img: ImageDto) => void }) {
+export function GalleryGrid({ images, label, startIndex, onDelete }: { images: ImageDto[]; label: string; startIndex: number; onDelete: (img: ImageDto) => void }) {
   return (
     <ul aria-label={label} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
       {images.map((img, i) => (

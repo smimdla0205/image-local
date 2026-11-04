@@ -14,6 +14,6 @@ export function clampSidebarWidth(raw: unknown): number {
 }
 
 export function readSidebarWidthCookie(cookie: string): number {
-  const match = cookie.match(/(?:^|; )sidebar_width=([^;]*)/);
+  const match = cookie.match(new RegExp(`(?:^|; )${SIDEBAR_WIDTH_COOKIE}=([^;]*)`));
   return clampSidebarWidth(match ? match[1] : undefined);
 }

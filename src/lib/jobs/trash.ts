@@ -1,6 +1,6 @@
 // 휴지통. 삭제는 deletedAt 만 찍고 파일은 남긴다. 비우기·만료 때만 행과 파일을 지운다
 import type { Conversation, Image, Prisma } from "@/generated/prisma/client";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, logErrorKind } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient } from "@/lib/gpu/client";
 import { toConversationDto, toImageDto } from "@/lib/jobs/queries";
@@ -9,7 +9,7 @@ import { staleUploadCutoff, trashCutoff, trashExpiresAt } from "@/lib/jobs/trash
 import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
 import { deleteImageFiles } from "@/lib/storage";
 
-export type Trashed = { id: string; deletedAt: Date };
+type Trashed = { id: string; deletedAt: Date };
 
 // 대화와 그 이미지를 같은 시각으로 휴지통에 넣고 진행 중인 잡은 전부 취소한다(제출 여부와 무관). 이미 휴지통이면 그대로
 export async function trashConversation(id: string): Promise<Trashed | null> {
@@ -92,13 +92,18 @@ export async function listTrash(): Promise<TrashDto> {
   };
 }
 
-export type PurgeOptions = { conversationIds?: string[]; imageIds?: string[]; before?: Date };
+type PurgeOptions = { conversationIds?: string[]; imageIds?: string[]; before?: Date };
 
 // 휴지통 항목을 영구 삭제한다. id 를 주면 그것만, 안 주면 전부(before 가 있으면 그보다 먼저 옮긴 것만).
 // 고르기와 지우기를 한 트랜잭션에서 해, 그 사이에 복구된 항목(deletedAt null)은 건드리지 않는다. 파일은 행을 지운 뒤 지운다
 export async function purgeTrash(opts: PurgeOptions): Promise<{ conversations: number; images: number }> {
   const all = !opts.conversationIds && !opts.imageIds;
   const deletedAt: Prisma.DateTimeNullableFilter = opts.before ? { not: null, lte: opts.before } : { not: null };
+  // 만료 정리는 쓰기 요청마다 돌므로, 지울 것이 없으면 트랜잭션을 열지 않는다
+  if (all && opts.before) {
+    const due = (await prisma.conversation.findFirst({ where: { deletedAt }, select: { id: true } })) ?? (await prisma.image.findFirst({ where: { deletedAt }, select: { id: true } }));
+    if (!due) return { conversations: 0, images: 0 };
+  }
   const { conversations, images } = await prisma.$transaction(async (tx) => {
     const conversations =
       all || opts.conversationIds
@@ -129,10 +134,6 @@ export async function purgeTrash(opts: PurgeOptions): Promise<{ conversations: n
   return { conversations: conversations.length, images: fileIds.length };
 }
 
-export async function purgeExpired(now = new Date()): Promise<{ conversations: number; images: number }> {
-  return purgeTrash({ before: trashCutoff(now) });
-}
-
 // 대화에 붙지 않은 채 오래된 업로드(칩에서 뺐거나 보내지 않은 사진)를 지운다
 export async function purgeStaleUploads(now = new Date()): Promise<number> {
   const rows = await prisma.image.findMany({ where: { kind: "UPLOADED", conversationId: null, createdAt: { lt: staleUploadCutoff(now) } }, select: { id: true } });
@@ -144,10 +145,10 @@ export async function purgeStaleUploads(now = new Date()): Promise<number> {
 
 // 쓰기 요청(삭제·업로드)이 끝난 뒤 돌리는 정리. 읽기(GET)는 아무것도 지우지 않는다. 실패는 요청에 영향을 주지 않고 로그만 남긴다
 export async function collectGarbage(): Promise<void> {
+  const now = new Date();
   try {
-    await purgeExpired();
-    await purgeStaleUploads();
+    await Promise.all([purgeTrash({ before: trashCutoff(now) }), purgeStaleUploads(now)]);
   } catch (e) {
-    console.error("[trash] gc", (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
+    logErrorKind("[trash] gc", e);
   }
 }

@@ -6,7 +6,7 @@ import { ApiError, handleRoute } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { makeVariants, normalizeImage, readImageSize } from "@/lib/images/normalize";
 import { toImageDto } from "@/lib/jobs/queries";
-import { purgeStaleUploads } from "@/lib/jobs/trash";
+import { collectGarbage } from "@/lib/jobs/trash";
 import { deleteImageFiles, putImageFiles } from "@/lib/storage";
 import { readStreamLimited } from "@/lib/streams";
 
@@ -74,8 +74,8 @@ export const POST = handleRoute("uploads.create", async (req) => {
     const image = await prisma.image.create({
       data: { id, kind: "UPLOADED", width: normalized.width, height: normalized.height, hasAlpha: normalized.hasAlpha, bytes: normalized.png.length },
     });
-    // 대화에 붙지 않은 채 24시간 지난 업로드는 응답을 보낸 뒤 지운다
-    after(() => purgeStaleUploads().catch((e: unknown) => console.error("[uploads] gc", (e as { name?: unknown })?.name)));
+    // 응답을 보낸 뒤 정리(대화에 붙지 않은 채 24시간 지난 업로드, 30일 지난 휴지통)
+    after(collectGarbage);
     return Response.json(toImageDto(image), { status: 201 });
   } catch (e) {
     // 행을 못 만들었으면 파일도 남기지 않는다

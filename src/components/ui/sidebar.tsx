@@ -364,21 +364,22 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
   React.useEffect(() => () => stopDrag.current?.(), [])
   if (isMobile || state === "collapsed") return null
 
-  // 사이드바는 왼쪽 가장자리(x=0)에 붙어 있어 포인터의 x 가 곧 너비다. rem 은 실제 루트 글자 크기로 환산한다
-  const toRem = (clientX: number) => clampSidebarWidth(clientX / (parseFloat(getComputedStyle(document.documentElement).fontSize) || REM_PX))
-
-  // 드래그는 window 에서 듣는다(핸들이 폭을 따라 움직여도 끊기지 않게). 놓으면 그때 저장한다.
-  // 기본 동작(글자 선택·드래그 시작)은 막고 포커스는 직접 준다(누른 뒤 방향키를 쓸 수 있게). 움직이지 않은 클릭은 너비를 바꾸지 않는다
+  // 드래그는 window 에서 듣는다(핸들이 폭을 따라 움직여도 끊기지 않게). 움직이는 동안은 CSS 변수만 바꾸고(상태를 바꾸면 사이드바
+  // 전체가 다시 그려진다) 놓을 때 한 번 상태·쿠키에 저장한다. 기본 동작(글자 선택·드래그 시작)은 막고 포커스는 직접 준다
+  // (누른 뒤 방향키를 쓸 수 있게). 움직이지 않은 클릭은 너비를 바꾸지 않는다
   function startDrag(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
     e.preventDefault()
     e.currentTarget.focus()
     stopDrag.current?.()
     setResizing(true)
+    // 사이드바는 왼쪽 가장자리(x=0)에 붙어 있어 포인터의 x 가 곧 너비다. rem 은 실제 루트 글자 크기로 환산한다(드래그 시작 때 한 번 읽는다)
+    const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || REM_PX
+    const toRem = (clientX: number) => clampSidebarWidth(clientX / remPx)
     let last: number | null = null
     const move = (ev: PointerEvent) => {
       last = ev.clientX
-      setWidth(toRem(last), false)
+      document.documentElement.style.setProperty("--sidebar-width-user", `${toRem(last)}rem`)
     }
     const stop = () => {
       stopDrag.current = null

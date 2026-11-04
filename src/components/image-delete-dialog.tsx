@@ -5,6 +5,7 @@ import { CircleAlertIcon, GitBranchIcon, Trash2Icon, Undo2Icon } from "lucide-re
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Fact } from "@/components/fact";
 import { FadeImage } from "@/components/fade-image";
 import {
   AlertDialog,
@@ -20,6 +21,7 @@ import { apiFetch, errorMessage } from "@/lib/api-client";
 import { getModel } from "@/lib/gpu/models";
 import type { ImageDto, ImageRefsDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
+import { invalidateAfterTrash, restoreFromTrash } from "@/lib/trash-client";
 
 type Props = {
   // null 이면 닫힌 상태
@@ -28,13 +30,6 @@ type Props = {
   // 휴지통으로 옮긴 직후(캐시 무효화 전)에 부른다. 뷰어 닫기·고칠 이미지 칩 빼기처럼 지운 id 를 더 쓰지 않게 하는 일에 쓴다
   onDeleted?: (id: string) => void;
 };
-
-// 갤러리 목록·대화·휴지통만 새로 받는다. 이미지 단건(뷰어)·참조 수는 지운 id 를 다시 불러 404 가 나지 않게 건드리지 않는다
-function invalidateAfterTrash(queryClient: ReturnType<typeof useQueryClient>) {
-  void queryClient.invalidateQueries({ queryKey: queryKeys.images.lists });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.trash.all });
-}
 
 // 이미지 삭제 확인창. 결과 카드·갤러리 타일·뷰어가 같이 쓴다. 지우면 휴지통으로 가고 토스트의 되돌리기로 바로 복구한다
 export function ImageDeleteDialog({ image, onOpenChange, onDeleted }: Props) {
@@ -50,7 +45,7 @@ export function ImageDeleteDialog({ image, onOpenChange, onDeleted }: Props) {
 
   async function restore(imageId: string) {
     try {
-      await apiFetch(`/api/images/${imageId}/restore`, { method: "POST" });
+      await restoreFromTrash("image", imageId);
       invalidateAfterTrash(queryClient);
       toast.success("복구했어요");
     } catch (e) {
@@ -100,25 +95,16 @@ export function ImageDeleteDialog({ image, onOpenChange, onDeleted }: Props) {
         </AlertDialogHeader>
         <ul className="flex flex-col gap-1 text-body">
           {refs.data && refs.data.children > 0 && (
-            <li className="flex items-start gap-2">
-              <GitBranchIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <span>
-                고친 버전 <span className="tabular-nums">{refs.data.children}</span>개의 원본 연결이 끊겨요
-              </span>
-            </li>
+            <Fact icon={<GitBranchIcon />}>
+              고친 버전 <span className="tabular-nums">{refs.data.children}</span>개의 원본 연결이 끊겨요
+            </Fact>
           )}
           {refs.data && refs.data.inputFor > 0 && (
-            <li className="flex items-start gap-2">
-              <CircleAlertIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <span>
-                이 이미지로 만든 요청 <span className="tabular-nums">{refs.data.inputFor}</span>건은 다시 생성할 수 없어요
-              </span>
-            </li>
+            <Fact icon={<CircleAlertIcon />}>
+              이 이미지로 만든 요청 <span className="tabular-nums">{refs.data.inputFor}</span>건은 다시 생성할 수 없어요
+            </Fact>
           )}
-          <li className="flex items-start gap-2">
-            <Undo2Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <span>30일 안에 휴지통에서 복구할 수 있어요</span>
-          </li>
+          <Fact icon={<Undo2Icon />}>30일 안에 휴지통에서 복구할 수 있어요</Fact>
         </ul>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>

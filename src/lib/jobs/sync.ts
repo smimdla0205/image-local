@@ -1,7 +1,7 @@
 // 활성 잡을 GPU 워커 상태로 맞춘다(GET 요청마다 호출 — 폴링). 결과가 나오면 이미지를 내려받아 저장한다
 import { randomUUID } from "node:crypto";
 
-import { ERROR_MESSAGES } from "@/lib/api/errors";
+import { ERROR_MESSAGES, logErrorKind } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/client";
 import { inspectPng, makeVariants } from "@/lib/images/normalize";
@@ -102,23 +102,26 @@ export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithIm
   const requests = active.map((job) => ({ job, status: job.submittedAt ? client.getJob(job.id) : null }));
   await Promise.allSettled(requests.map((r) => r.status));
 
-  // 아직 안 보낸 잡은 차례로 보낸다(같은 입력 이미지를 한 번만 올리도록). 응답 뒤 제출(after)이 보내는 중인 잡은 submitToWorker 가 건너뛴다
-  for (const { job, status } of requests) {
-    if (status) continue;
-    touched.add(job.id);
-    try {
-      if ((await submitToWorker(job, inputIds)) === "unavailable") {
-        reachable = false;
-        break;
+  // 아직 안 보낸 잡은 차례로 보낸다(같은 입력 이미지를 한 번만 올리도록). 응답 뒤 제출(after)이 보내는 중인 잡은 그 결과를 같이 기다린다.
+  // 보낸 잡의 상태 반영과는 서로 기다리지 않는다(새 요청을 보내는 사이에도 진행 중인 잡의 폴링 응답이 늦지 않게)
+  const submitPending = (async () => {
+    for (const { job, status } of requests) {
+      if (status) continue;
+      touched.add(job.id);
+      try {
+        if ((await submitToWorker(job, inputIds)) === "unavailable") {
+          reachable = false;
+          break;
+        }
+      } catch (e) {
+        // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다
+        logErrorKind("[sync]", e, job.id);
       }
-    } catch (e) {
-      // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다. 잡 id 와 오류 종류만 남긴다
-      console.error("[sync]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
     }
-  }
+  })();
 
   // 보낸 잡의 상태는 함께 반영한다(결과 저장이 서로 기다리지 않는다). 잡마다 따로 처리해 한 잡의 오류가 응답 전체를 500 으로 만들지 않는다
-  await Promise.all(
+  const applyStatuses = Promise.all(
     requests.map(async ({ job, status }) => {
       if (!status) return;
       try {
@@ -144,12 +147,13 @@ export async function syncJobs(jobs: JobWithImages[]): Promise<{ jobs: JobWithIm
         } else if (e instanceof WorkerError) {
           await patchIfActive(job.id, { status: "FAILED", error: e.workerMessage ?? ERROR_MESSAGES.internal_error });
         } else {
-          // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다. 잡 id 와 오류 종류만 남긴다
-          console.error("[sync]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
+          // 디스크·DB 오류는 이 잡만 다음 폴링에 다시 시도한다
+          logErrorKind("[sync]", e, job.id);
         }
       }
     }),
   );
+  await Promise.all([submitPending, applyStatuses]);
 
   if (touched.size === 0) return { jobs, worker: { reachable } };
   return { jobs: await reloadJobs(jobs, touched), worker: { reachable } };

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/shell/app-shell";
 // 글자 범위별 조각(92개)이라 브라우저는 화면에 쓰인 글자가 든 조각만 받는다
 import "./fonts/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
+import { SIDEBAR_WIDTH_COOKIE, SIDEBAR_WIDTH_MAX, SIDEBAR_WIDTH_MIN } from "@/lib/sidebar-width";
 
 // 디자인 시스템 글꼴. globals.css 의 --font-sans 가 Inter, Pretendard Variable 순서로 쌓아 영문·숫자는 Inter, 한글은 Pretendard 로 그린다
 const inter = Inter({
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
 
 // hydration 전에 쿠키(sidebar_state·sidebar_width)로 사이드바 접힘·너비를 html 에 올려 첫 페인트부터 맞춘다.
 // 접힘은 SidebarProvider 가 상태를 맞춘 뒤 속성을 지우고, 너비 변수는 그대로 쓴다. 고정 문자열이라 dangerouslySetInnerHTML 로 넣는다
-const SIDEBAR_RESTORE_SCRIPT = `(function(){try{var c=document.cookie;if(/(?:^|; )sidebar_state=false(?:;|$)/.test(c))document.documentElement.dataset.sidebar="collapsed";var m=c.match(/(?:^|; )sidebar_width=([0-9.]+)/);if(m){var n=Math.min(24,Math.max(12,parseFloat(m[1])));if(!isNaN(n))document.documentElement.style.setProperty("--sidebar-width-user",n+"rem")}}catch(e){}})()`;
+const SIDEBAR_RESTORE_SCRIPT = `(function(){try{var c=document.cookie;if(/(?:^|; )sidebar_state=false(?:;|$)/.test(c))document.documentElement.dataset.sidebar="collapsed";var m=c.match(/(?:^|; )${SIDEBAR_WIDTH_COOKIE}=([0-9.]+)/);if(m){var n=Math.min(${SIDEBAR_WIDTH_MAX},Math.max(${SIDEBAR_WIDTH_MIN},parseFloat(m[1])));if(!isNaN(n))document.documentElement.style.setProperty("--sidebar-width-user",n+"rem")}}catch(e){}})()`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

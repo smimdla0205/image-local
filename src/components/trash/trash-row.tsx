@@ -7,15 +7,9 @@ import { FadeImage } from "@/components/fade-image";
 import { Button } from "@/components/ui/button";
 import { getModel } from "@/lib/gpu/models";
 import type { TrashConversationDto, TrashImageDto } from "@/lib/jobs/schemas";
+import { trashDaysLeft } from "@/lib/jobs/trash-ttl";
 
 export type TrashItem = { kind: "conversation"; item: TrashConversationDto } | { kind: "image"; item: TrashImageDto };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// 자동으로 지워질 때까지 남은 날. 당일은 D-0
-export function daysLeft(expiresAt: string, now: Date): number {
-  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now.getTime()) / DAY_MS));
-}
 
 function describe(entry: TrashItem): { title: string; meta: string; thumbUrl: string | null } {
   if (entry.kind === "conversation") {
@@ -53,7 +47,7 @@ export function TrashRow({ entry, now, busy, onRestore, onPurge }: Props) {
         <p className="truncate text-label">{title}</p>
         <p className="text-caption text-muted-foreground">{meta}</p>
       </div>
-      <span className="text-caption text-muted-foreground tabular-nums">D-{daysLeft(entry.item.expiresAt, now)}</span>
+      <span className="text-caption text-muted-foreground tabular-nums">D-{trashDaysLeft(entry.item.expiresAt, now)}</span>
       <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onRestore(entry)} className="max-md:h-11">
         <Undo2Icon aria-hidden="true" />
         복구

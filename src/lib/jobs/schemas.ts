@@ -6,8 +6,6 @@ import { type Ratio, RATIOS } from "../gpu/sizes";
 import { DETAIL_JOB_LIMIT, ID_RE, PROMPT_MAX, SEED_MAX } from "./constants";
 
 export type { ModelId, Ratio };
-// 서버 코드는 여기서 같이 가져간다. 클라이언트 컴포넌트는 zod 가 딸려오지 않게 constants 에서 직접 가져온다
-export { DETAIL_JOB_LIMIT, ID_RE, parseId, PROMPT_MAX, SEED_MAX } from "./constants";
 
 export const modelIdSchema = z.enum(MODEL_IDS);
 export const ratioSchema = z.enum(RATIOS);
@@ -40,7 +38,6 @@ export const imageListQuerySchema = z.object({
 export const purgeBodySchema = z.object({
   conversationIds: z.array(z.string().regex(ID_RE)).max(100).optional(),
   imageIds: z.array(z.string().regex(ID_RE)).max(100).optional(),
-  before: z.iso.datetime().optional(),
 });
 
 // GET /api/conversations/[id]/jobs?ids=a,b — 물을 잡 id 를 쉼표로 잇는다

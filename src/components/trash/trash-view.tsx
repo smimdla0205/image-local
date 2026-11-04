@@ -21,10 +21,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { LoadError } from "@/components/ui/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import type { TrashDto } from "@/lib/jobs/schemas";
 import { queryKeys } from "@/lib/query-keys";
+import { invalidateAfterTrash, restoreFromTrash } from "@/lib/trash-client";
 
 function TrashSkeleton() {
   return (
@@ -53,18 +55,12 @@ export function TrashView() {
   const [busy, setBusy] = useState(false);
   const [emptyOpen, setEmptyOpen] = useState(false);
 
-  function invalidate() {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.trash.all });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.images.lists });
-  }
-
   // 성공하면 true. 실패는 토스트로 알리고 부른 쪽이 화면(확인창)을 유지할 수 있게 false
   async function run(action: () => Promise<unknown>, done: string, failed: string): Promise<boolean> {
     setBusy(true);
     try {
       await action();
-      invalidate();
+      invalidateAfterTrash(queryClient);
       toast.success(done);
       return true;
     } catch (e) {
@@ -77,7 +73,7 @@ export function TrashView() {
 
   const handleRestore = (entry: TrashItem) =>
     run(
-      () => apiFetch(entry.kind === "conversation" ? `/api/conversations/${entry.item.id}/restore` : `/api/images/${entry.item.id}/restore`, { method: "POST" }),
+      () => restoreFromTrash(entry.kind, entry.item.id),
       "복구했어요",
       "복구하지 못했어요. 다시 시도해 주세요.",
     );
@@ -97,7 +93,7 @@ export function TrashView() {
 
   let content: React.ReactNode;
   if (trash.isPending) content = <TrashSkeleton />;
-  else if (trash.isError) content = <p className="py-16 text-center text-caption text-muted-foreground">휴지통을 불러오지 못했어요</p>;
+  else if (trash.isError) content = <LoadError align="center" message="휴지통을 불러오지 못했어요" onRetry={() => void trash.refetch()} />;
   else if (entries.length === 0)
     content = (
       <Empty className="border py-10">

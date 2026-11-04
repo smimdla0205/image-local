@@ -4,15 +4,16 @@ import { randomInt, randomUUID } from "node:crypto";
 import type { z } from "zod";
 
 import type { Image, Prisma } from "@/generated/prisma/client";
-import { ApiError, ERROR_MESSAGES } from "@/lib/api/errors";
+import { ApiError, ERROR_MESSAGES, logErrorKind } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { getWorkerClient, isWorkerUnavailable, WorkerError } from "@/lib/gpu/client";
 import { getModel, type ModelId } from "@/lib/gpu/models";
 import { fitToMegapixel, SIZE_BY_RATIO } from "@/lib/gpu/sizes";
 import { ACTIVE_WINDOW_MS, assertCapacity } from "@/lib/jobs/capacity";
+import { SEED_MAX } from "@/lib/jobs/constants";
 import { jobInclude, type JobWithImages } from "@/lib/jobs/queries";
-import { type createJobsBodySchema, SEED_MAX } from "@/lib/jobs/schemas";
-import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
+import type { createJobsBodySchema } from "@/lib/jobs/schemas";
+import { ACTIVE_STATUSES, isActive } from "@/lib/jobs/transitions";
 import { readFileIfExists, storageKey } from "@/lib/storage";
 
 export type CreateJobsInput = z.output<typeof createJobsBodySchema>;
@@ -104,7 +105,7 @@ async function sendToWorker(job: JobWithImages, inputIds: Map<string, string>): 
   try {
     // 받은 잡은 응답 전의 스냅숏이다. 그 사이 다른 쪽이 보냈거나(submittedAt) 취소·완료됐으면 보내지 않는다(입력 업로드·GPU 낭비 없이)
     const fresh = await prisma.job.findUnique({ where: { id: job.id }, select: { submittedAt: true, status: true } });
-    if (!fresh || fresh.submittedAt !== null || !ACTIVE_STATUSES.includes(fresh.status)) return "submitted";
+    if (!fresh || fresh.submittedAt !== null || !isActive(fresh.status)) return "submitted";
     let inputId: string | null = null;
     if (job.kind === "EDIT") {
       if (!job.inputImage) {
@@ -160,8 +161,7 @@ export async function submitJobs(jobs: JobWithImages[]): Promise<void> {
     try {
       result = await submitToWorker(job, inputIds);
     } catch (e) {
-      // 잡 id 와 오류 종류만 남긴다(메시지에 프롬프트·경로가 섞일 수 있다)
-      console.error("[submit]", job.id, (e as { name?: unknown })?.name, (e as { code?: unknown })?.code);
+      logErrorKind("[submit]", e, job.id);
       break;
     }
     if (result === "unavailable") break;

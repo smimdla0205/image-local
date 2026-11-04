@@ -2,7 +2,8 @@
 import type { Conversation, Image, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { isModelId, type ModelId } from "@/lib/gpu/models";
-import { type ConversationCounts, type ConversationDetailDto, type ConversationDto, DETAIL_JOB_LIMIT, type ImageDto, type JobDto, type WorkerState } from "@/lib/jobs/schemas";
+import { DETAIL_JOB_LIMIT } from "@/lib/jobs/constants";
+import type { ConversationCounts, ConversationDetailDto, ConversationDto, ImageDto, JobDto, WorkerState } from "@/lib/jobs/schemas";
 import { ACTIVE_STATUSES } from "@/lib/jobs/transitions";
 import { type StorageKind, storageKey } from "@/lib/storage";
 
@@ -121,7 +122,7 @@ export function toConversationDto(c: Conversation, thumbImageId: string | null):
 }
 
 export function toConversationDetailDto(c: Conversation, jobs: JobWithImages[], worker: WorkerState, counts: ConversationCounts): ConversationDetailDto {
-  const latestImage = [...jobs].reverse().find((j) => j.image && !j.image.deletedAt)?.image ?? null;
+  const latestImage = [...jobs].reverse().map((j) => liveImage(j.image)).find((i) => i !== null) ?? null;
   return { ...toConversationDto(c, latestImage?.id ?? null), jobs: jobs.map(toJobDto), worker, counts };
 }
 
